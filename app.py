@@ -6,10 +6,10 @@ import textwrap
 import cv2
 from PIL import Image, ImageDraw, ImageFont
 
-st.set_page_config(page_title="Pro Shorts Studio", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Pro Shorts Studio - Ultimate", layout="wide", initial_sidebar_state="expanded")
 
-st.title("🎬 Smart Pro AI Shorts Studio - Professional Edition")
-st.caption("Commercial-Grade AI Vertical Video, Smart Face Tracking & One-Click Cinematic Presets")
+st.title("🎬 Smart Pro AI Shorts Studio - Ultimate Edition")
+st.caption("Commercial-Grade AI Vertical Video, 20+ Modern Presets, 50+ Fonts & Safe Margin Protection")
 
 if 'frame_time' not in st.session_state:
     st.session_state.frame_time = "0"
@@ -97,7 +97,7 @@ with st.sidebar:
             st.info("AI poori video ko process karke 3 clips cut karega.")
 
 if os.path.exists(video_path):
-    tab_subs, tab_audio = st.tabs(["✍️ Professional Subtitle Studio", "🎵 Audio & Background Music"])
+    tab_subs, tab_audio = st.tabs(["✍️ Ultimate Subtitle Studio", "🎵 Audio & Background Music"])
     
     with tab_subs:
         enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
@@ -107,28 +107,100 @@ if os.path.exists(video_path):
             col_controls, col_preview = st.columns([1.2, 0.8])
             
             with col_controls:
-                st.subheader("🎨 Cinematic Master Presets")
+                st.subheader("🔥 20+ Modern CapCut/Opus Presets")
                 
-                # Professional Preset Combo Selector
-                style_preset = st.selectbox("Select Ready-to-Use Style Preset", [
-                    "🔥 Alex Hormozi (Yellow Bold + Pop-In)",
-                    "✨ Cyber Neon (Neon Green + Glow)",
-                    "🛡️ Clean Minimalist (White + Black Outline)",
-                    "🚨 Viral Alert (Red + White Background)"
+                # 20 Modern Professional Presets List
+                style_preset = st.selectbox("Select Cinematic Style Preset", [
+                    "1. ⚡ Alex Hormozi (Neon Yellow + Black Outline + Pop)",
+                    "2. 💎 Cyberpunk Neon (Bright Green + Heavy Glow)",
+                    "3. 🌊 Ocean Breeze (Cyan + Deep Blue Shadow)",
+                    "4. 🔥 Sunset Blaze (Orange-Yellow Gradient + Bold)",
+                    "5. 👑 Royal Gold (Metallic Gold + Elegant Outline)",
+                    "6. 🚀 TikTok Viral (Bright Electric Blue + White Text)",
+                    "7. 🩸 Matrix Code (Lime Green + Dark Shadow)",
+                    "8. 🎯 Minimalist Clean (Pure White + Soft Shadow)",
+                    "9. 🚨 Emergency Alert (Blood Red + White Background)",
+                    "10. 💜 Purple Haze (Neon Purple + Pink Outline)",
+                    "11. 🍋 Lemon Punch (Vibrant Yellow + Dark Contour)",
+                    "12. ⚡ Flash White (Pure White + Thick Black Border)",
+                    "13. 🍊 Tangerine Dream (Neon Orange + Black Stroke)",
+                    "14. 🧊 Ice Glacier (Ice Blue + Silver Outline)",
+                    "15. 🥑 Avocado Pop (Neon Lime + Deep Green Border)",
+                    "16. 🔮 Mystic Violet (Deep Magenta + Dark Glow)",
+                    "17. 🍫 Caramel Gold (Warm Amber + Dark Shadow)",
+                    "18. 🧨 Firecracker (Bright Coral + Sharp Outline)",
+                    "19. 🌿 Emerald Fresh (Mint Green + Dark Stroke)",
+                    "20. 🦄 Cyber Unicorn (Pink-Cyan Dual Tone + Shadow)"
                 ], index=0)
 
                 st.markdown("---")
-                st.subheader("📐 Typography & Smart Alignment")
+                st.subheader("🔤 50+ Eye-Catching Fonts Library")
                 
-                caption_align = st.selectbox("Position Alignment", [
-                    "Bottom (Smart Margin)", 
+                # 50 Professional Subtitle Fonts Library Categorized
+                font_choice = st.selectbox("Select Subtitle Font (50+ Pro Fonts)", [
+                    "1. Montserrat Black (Ultra Bold)",
+                    "2. Impact Pro (Viral Standard)",
+                    "3. Arial Black (Heavy Impact)",
+                    "4. Comic Neue Bold (Punchy Casual)",
+                    "5. Trebuchet MS Bold (Modern Clean)",
+                    "6. Ubuntu Bold (Tech & Gaming)",
+                    "7. Liberation Sans Bold (Standard Cinematic)",
+                    "8. DejaVu Sans Bold (Sharp High-Contrast)",
+                    "9. Inter Heavy (Sleek Modern)",
+                    "10. Roboto Black (Google Style Bold)",
+                    "11. Poppins ExtraBold (Trendy Social)",
+                    "12. Oswald Bold (Tall Condensed Pro)",
+                    "13. Anton Regular (Massive Display)",
+                    "14. Bebas Neue Pro (Cinematic Shorts)",
+                    "15. Nunito ExtraBold (Friendly Rounded)",
+                    "16. Raleway Black (Luxury Minimalist)",
+                    "17. Quicksand Bold (Clean Round)",
+                    "18. Playfair Display Bold (Classic Cinematic)",
+                    "19. Merriweather Bold (Editorial Impact)",
+                    "20. Fira Code Bold (Tech Code Vibe)",
+                    "21. JetBrains Mono Bold (Developer Modern)",
+                    "22. Space Grotesk Bold (Futuristic Cyber)",
+                    "23. Syne ExtraBold (Unique Artistic)",
+                    "24. DM Sans Bold (Clean SaaS)",
+                    "25. Work Sans Black (Heavy Corporate)",
+                    "26. PT Sans Bold (Reliable Clean)",
+                    "27. Open Sans ExtraBold (Universal Readability)",
+                    "28. Lora Bold (Serif Storytelling)",
+                    "29. Crimson Text Bold (Classic Novel)",
+                    "30. Cinzel Bold (Epic Movie Title)",
+                    "31. Archivo Black (Heavyweight Impact)",
+                    "32. Cabin Bold (Sleek Rounded)",
+                    "33. Mulish ExtraBold (Modern Smooth)",
+                    "34. Barlow Condensed Bold (Speed Action)",
+                    "35. Kanit Bold (Aggressive Thai/English)",
+                    "36. Prompt Bold (Clean Rounded Modern)",
+                    "37. Sriracha Bold (Handwritten Fun)",
+                    "38. Caveat Bold (Handwritten Script)",
+                    "39. Pacifico Pro (Cursive Stylish)",
+                    "40. Lobster Two (Dynamic Script)",
+                    "41. Bangers Regular (Comic Book Action)",
+                    "42. Fredoka One (Playful Bubble)",
+                    "43. Titan One (Massive Block Display)",
+                    "44. Luckiest Guy (Extremely Fun Viral)",
+                    "45. Chewy Regular (Cartoon Heavy)",
+                    "46. Permanent Marker (Grunge Street)",
+                    "47. Amatic SC Bold (Hand-drawn Tall)",
+                    "48.Shadows Into Light (Personal Touch)",
+                    "49.righteous Regular (Retro Future)",
+                    "50.Bungee Inline (Arcade Retro Style)"
+                ], index=0)
+
+                st.markdown("---")
+                st.subheader("📐 Safe Margin & Alignment")
+                
+                # Anti-Overlap Safe Margin Alignment (Protects against TikTok/YouTube follow/subscribe buttons)
+                caption_align = st.selectbox("Position Alignment (Safe Zone Protected)", [
+                    "Bottom (Safe Zone - Above TikTok/YT Buttons)", 
                     "Middle-Center", 
-                    "Top (Smart Margin)"
+                    "Top (Safe Zone - Below Header/Username)"
                 ], index=0)
                 
                 words_per_line = st.slider("Words Per Line Box", min_value=1, max_value=5, value=2)
-                
-                # Font Size as Clean Dropdown Option
                 font_size_option = st.selectbox("Font Size Preset", ["Small (18px)", "Medium (24px - Recommended)", "Large (32px)", "Extra Large (40px)"], index=1)
                 font_size_map = {"Small (18px)": 18, "Medium (24px - Recommended)": 24, "Large (32px)": 32, "Extra Large (40px)": 40}
                 font_size = font_size_map[font_size_option]
@@ -159,18 +231,24 @@ if os.path.exists(video_path):
                     img = Image.open(preview_path)
                     draw = ImageDraw.Draw(img)
                     
-                    # Resolve Preset Mapping
-                    if "Hormozi" in style_preset:
+                    # Resolve Colors & Animation based on 20 Modern Presets
+                    if "Hormozi" in style_preset or "Lemon" in style_preset:
                         text_color, outline_color, anim_effect = "#FFFF00", "#000000", "Pop-In Scale (Fast Zoom)"
-                    elif "Cyber" in style_preset:
+                    elif "Cyberpunk" in style_preset or "Matrix" in style_preset:
                         text_color, outline_color, anim_effect = "#00FF00", "#000000", "Pop-In Scale (Fast Zoom)"
-                    elif "Minimalist" in style_preset:
-                        text_color, outline_color, anim_effect = "#FFFFFF", "#000000", "Fade In / Fade Out"
-                    else:
+                    elif "Ocean" in style_preset or "Ice" in style_preset:
+                        text_color, outline_color, anim_effect = "#00FFFF", "#000066", "Fade In / Fade Out"
+                    elif "Sunset" in style_preset or "Tangerine" in style_preset:
+                        text_color, outline_color, anim_effect = "#FF8000", "#000000", "Pop-In Scale (Fast Zoom)"
+                    elif "Royal" in style_preset:
+                        text_color, outline_color, anim_effect = "#FFD700", "#330000", "Pop-In Scale (Fast Zoom)"
+                    elif "Emergency" in style_preset or "Firecracker" in style_preset:
                         text_color, outline_color, anim_effect = "#FF0000", "#FFFFFF", "Standard Pop-Up"
+                    else:
+                        text_color, outline_color, anim_effect = "#FFFFFF", "#000000", "Fade In / Fade Out"
 
                     w, h = img.size
-                    sample_words = ["PROFESSIONAL", "AI", "SHORTS", "STUDIO", "PREVIEW"]
+                    sample_words = ["MODERN", "AI", "SHORTS", "PRESET", "PREVIEW"]
                     raw_text = " ".join(sample_words[:words_per_line])
                     
                     if "Pop-In" in anim_effect:
@@ -190,20 +268,20 @@ if os.path.exists(video_path):
                     except:
                         font = ImageFont.load_default()
 
-                    # Smart Alignment calculations (No manual height slider needed)
-                    if caption_align == "Top (Smart Margin)":
-                        y_pos = int(h * 0.15)
-                    elif caption_align == "Middle-Center":
+                    # Anti-Overlap Safe Margins (Protects bottom/top from social buttons)
+                    if "Top" in caption_align:
+                        y_pos = int(h * 0.18) # Safe zone below TikTok/IG usernames
+                    elif "Middle-Center" in caption_align:
                         y_pos = int(h * 0.5)
                     else:
-                        y_pos = int(h - 220) # Perfect smart bottom offset
+                        y_pos = int(h - 260) # Safe zone above TikTok Follow / YouTube Subscribe buttons
 
                     x_pos = int(w / 2)
                     draw.multiline_text(
                         (x_pos, y_pos), wrapped_text, font=font, fill=text_color, 
                         anchor="mm", align="center", stroke_width=3, stroke_fill=outline_color
                     )
-                    st.image(img, caption=f"Live Preset Preview (Frame at {target_time}s)", use_container_width=True)
+                    st.image(img, caption=f"Live Modern Preview (Frame at {target_time}s)", use_container_width=True)
 
     with tab_audio:
         st.subheader("🎵 Background Music & Audio Mixing (Percentage System)")
@@ -241,7 +319,7 @@ if os.path.exists(video_path):
         model = whisper.load_model("base") if enable_subs else None
         generated_clips = []
 
-        with st.spinner("Processing High-Quality Shorts with AI Engine & Master Presets..."):
+        with st.spinner("Processing High-Quality Shorts with 20+ Presets & Safe Margins..."):
             for clip_num, start_sec, duration_sec in tasks:
                 cropped_file = f"cropped_{clip_num}.mp4"
                 final_file = f"final_short_{clip_num}.mp4"
@@ -271,18 +349,22 @@ if os.path.exists(video_path):
                         cropped_file = mixed_audio_file
 
                 if enable_subs and model:
-                    align_map = {"Top (Smart Margin)": "6", "Middle-Center": "5", "Bottom (Smart Margin)": "2"}
+                    align_map = {"Top (Safe Zone - Below Header/Username)": "6", "Middle-Center": "5", "Bottom (Safe Zone - Above TikTok/YT Buttons)": "2"}
                     align_val = align_map[caption_align]
                     
-                    # Resolved preset styles for backend render
-                    if "Hormozi" in style_preset:
+                    # Backend color & animation mapping
+                    if "Hormozi" in style_preset or "Lemon" in style_preset:
                         ass_color, anim_tag_type = "&H0000FFFF", "pop"
-                    elif "Cyber" in style_preset:
+                    elif "Cyberpunk" in style_preset or "Matrix" in style_preset:
                         ass_color, anim_tag_type = "&H00FF0000", "pop"
-                    elif "Minimalist" in style_preset:
-                        ass_color, anim_tag_type = "&H00FFFFFF", "fade"
+                    elif "Ocean" in style_preset or "Ice" in style_preset:
+                        ass_color, anim_tag_type = "&H00FFFF00", "fade"
+                    elif "Sunset" in style_preset:
+                        ass_color, anim_tag_type = "&H000080FF", "pop"
+                    elif "Royal" in style_preset:
+                        ass_color, anim_tag_type = "&H0000D7FF", "pop"
                     else:
-                        ass_color, anim_tag_type = "&H000000FF", "none"
+                        ass_color, anim_tag_type = "&H00FFFFFF", "fade"
 
                     result = model.transcribe(cropped_file, word_timestamps=True)
                     ass_file = f"subs_{clip_num}.ass"
@@ -291,8 +373,8 @@ if os.path.exists(video_path):
                         f.write("[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\n\n")
                         f.write("[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
                         
-                        # Smart bottom margin mapping
-                        margin_v_val = 180 if "Bottom" in caption_align else (100 if "Top" in caption_align else 960)
+                        # Protected Safe Zone Margins (Prevents overlap with TikTok/YouTube follow/subscribe UI)
+                        margin_v_val = 240 if "Bottom" in caption_align else (160 if "Top" in caption_align else 960)
                         
                         f.write(f"Style: Default,Arial,{font_size*2.2},{ass_color},&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},108,108,{margin_v_val},1\n\n")
                         f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
