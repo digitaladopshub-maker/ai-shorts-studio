@@ -4,7 +4,8 @@ import subprocess
 import os
 import textwrap
 import cv2
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
+from fonts import get_pro_font
 
 st.set_page_config(page_title="Clipping", layout="wide", initial_sidebar_state="expanded")
 
@@ -40,38 +41,6 @@ def detect_face_center(v_path, start_sec):
     except Exception:
         return None
     return None
-
-def get_font_path(font_choice):
-    font_pools = {
-        "serif": [
-            "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf"
-        ],
-        "mono": [
-            "/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
-        ],
-        "clean": [
-            "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-        ],
-        "heavy": [
-            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
-        ]
-    }
-    if any(x in font_choice for x in ["Playfair", "Lora", "Merriweather", "Crimson", "Cinzel", "Serif"]):
-        pool = font_pools["serif"]
-    elif any(x in font_choice for x in ["Mono", "Code", "JetBrains", "Fira"]):
-        pool = font_pools["mono"]
-    elif any(x in font_choice for x in ["Comic", "Caveat", "Pacifico", "Lobster", "Sriracha"]):
-        pool = font_pools["clean"]
-    else:
-        pool = font_pools["heavy"]
-        
-    for f in pool:
-        if os.path.exists(f):
-            return f
-    return "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
 with st.sidebar:
     st.header("📥 1. Media Input")
@@ -135,10 +104,10 @@ if os.path.exists(video_path):
         enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
         
         if enable_subs:
+            # Layout structured so preview column aligns perfectly parallel with the Font section
             col_controls, col_preview = st.columns([1.5, 0.7])
             
             with col_controls:
-                # Row 1: Preset & Font
                 r1_col1, r1_col2 = st.columns(2)
                 with r1_col1:
                     style_preset = st.selectbox("Preset", [
@@ -181,7 +150,6 @@ if os.path.exists(video_path):
                         "49. Righteous Regular", "50. Bungee Inline"
                     ], index=0)
 
-                # Row 2: Position & Font Size
                 r2_col1, r2_col2 = st.columns(2)
                 with r2_col1:
                     caption_align = st.selectbox("Position", [
@@ -195,7 +163,6 @@ if os.path.exists(video_path):
                     font_size_map = {"Small (18px)": 18, "Medium (24px - Rec)": 24, "Large (32px)": 32, "Extra Large (40px)": 40}
                     font_size = font_size_map[font_size_option]
 
-                # Row 3: Words per line & Speed Side-by-Side
                 r3_col1, r3_col2 = st.columns(2)
                 with r3_col1:
                     words_per_line_option = st.selectbox("Words Per Line", ["1 Word", "2 Words (Recommended)", "3 Words", "4 Words", "5 Words"], index=1)
@@ -205,21 +172,21 @@ if os.path.exists(video_path):
                     video_speed = st.selectbox("Video Speed (Retention)", ["1.0x (Normal)", "1.1x (Fast Viral)", "1.25x (Super Fast)"], index=0)
                     speed_val = 1.0 if "1.0x" in video_speed else (1.1 if "1.1x" in video_speed else 1.25)
 
-                # Row 4: Copyright Protection & Filters Side-by-Side
                 r4_col1, r4_col2 = st.columns(2)
                 with r4_col1:
                     enable_flip = st.checkbox("🔄 Horizontal Flip (Anti-Copyright)", value=False)
                 with r4_col2:
-                    color_filter = st.selectbox("Cinematic Filter", ["Normal", "Cyberpunk Glow", "High Contrast", "Warm Cinematic"], index=0)
+                    color_filter = st.selectbox("Cinematic Filter", ["Normal", "Cyberpunk Glow", "High Contrast", "Warm Cinematic", "Vintage Film 70s", "HDR Vibrant"], index=0)
 
-                # Face Tracking right below
+                # Clipchamp-Style Effects Dropdown
+                clipchamp_effect = st.selectbox("✨ Clipchamp Style Effects", ["None", "Soft Vignette Glow", "VHS Glitch Overlay", "Cinematic Letterbox (Cinemascope)", "Bokeh Blur Background Touch"], index=0)
+
                 enable_face_tracking = st.checkbox("🤖 Enable Smart AI Face Tracking (Center Crop on Speaker)", value=True)
 
                 st.markdown("---")
                 render_clicked = st.button("🚀 Render Shorts Batch Now", type="primary", use_container_width=True)
 
             with col_preview:
-                # Instant automatic live preview (No refresh button needed!)
                 target_time = clip_ranges[0][0] if (clip_mode == "Manual Timestamps (Precise)" and clip_ranges) else "0"
                 
                 vf_parts = []
@@ -241,6 +208,15 @@ if os.path.exists(video_path):
                     vf_parts.append("eq=contrast=1.3:brightness=0.05")
                 elif color_filter == "Warm Cinematic":
                     vf_parts.append("colorbalance=rm=0.1:bm=-0.1")
+                elif color_filter == "Vintage Film 70s":
+                    vf_parts.append("eq=saturation=0.7:contrast=1.1,colorbalance=rm=0.2:gm=0.1")
+                elif color_filter == "HDR Vibrant":
+                    vf_parts.append("unsharp=3:3:1.5:3:3:0.5")
+
+                if clipchamp_effect == "Cinematic Letterbox (Cinemascope)":
+                    vf_parts.append("drawbox=y=0:h=ih/10:color=black:t=fill,drawbox=y=ih-ih/10:h=ih/10:color=black:t=fill")
+                elif clipchamp_effect == "Soft Vignette Glow":
+                    vf_parts.append("vignette=PI/4")
 
                 vf_parts.append("scale=540:960")
                 vf_preview_str = ",".join(vf_parts)
@@ -281,11 +257,8 @@ if os.path.exists(video_path):
                     wrapped_lines = textwrap.wrap(raw_text, width=14)
                     wrapped_text = "\n".join(wrapped_lines)
 
-                    selected_fpath = get_font_path(font_choice)
-                    try:
-                        font = ImageFont.truetype(selected_fpath, int(font_size * 1.6))
-                    except:
-                        font = ImageFont.load_default()
+                    # Fetch real font instance dynamically from dedicated font file
+                    font = get_pro_font(font_choice, font_size)
 
                     if "Top" in caption_align:
                         y_pos = int(h * 0.18)
@@ -299,6 +272,7 @@ if os.path.exists(video_path):
                         (x_pos, y_pos), wrapped_text, font=font, fill=text_color, 
                         anchor="mm", align="center", stroke_width=3, stroke_fill=outline_color
                     )
+                    # Preview frame neatly aligned parallel to settings top
                     st.image(img, width=280, caption=f"Live Preview ({font_choice.split('.')[1].strip()})")
 
     with tab_audio:
@@ -341,7 +315,6 @@ if os.path.exists(video_path):
                 cropped_file = f"cropped_{clip_num}.mp4"
                 final_file = f"final_short_{clip_num}.mp4"
                 
-                # Build Full Render FFmpeg Filter String with Face Tracking, Flip, Filters & Speed
                 render_vf_parts = []
                 if enable_face_tracking:
                     f_x = detect_face_center(video_path, start_sec)
@@ -361,6 +334,15 @@ if os.path.exists(video_path):
                     render_vf_parts.append("eq=contrast=1.3:brightness=0.05")
                 elif color_filter == "Warm Cinematic":
                     render_vf_parts.append("colorbalance=rm=0.1:bm=-0.1")
+                elif color_filter == "Vintage Film 70s":
+                    render_vf_parts.append("eq=saturation=0.7:contrast=1.1,colorbalance=rm=0.2:gm=0.1")
+                elif color_filter == "HDR Vibrant":
+                    render_vf_parts.append("unsharp=3:3:1.5:3:3:0.5")
+
+                if clipchamp_effect == "Cinematic Letterbox (Cinemascope)":
+                    render_vf_parts.append("drawbox=y=0:h=ih/10:color=black:t=fill,drawbox=y=ih-ih/10:h=ih/10:color=black:t=fill")
+                elif clipchamp_effect == "Soft Vignette Glow":
+                    render_vf_parts.append("vignette=PI/4")
 
                 render_vf_parts.append("scale=1080:1920")
                 
@@ -368,8 +350,6 @@ if os.path.exists(video_path):
                     render_vf_parts.append(f"setpts=PTS/{speed_val}")
 
                 render_vf_str = ",".join(render_vf_parts)
-
-                # Audio speed filter mapping if speed is changed
                 audio_filter_str = f"atempo={speed_val}" if speed_val != 1.0 else "anull"
 
                 crop_cmd = (
@@ -435,7 +415,7 @@ if os.path.exists(video_path):
                                     
                                     s_m, s_s = divmod(start_t, 60)
                                     s_h, s_m = divmod(s_m, 60)
-                                    e_m, e_s = divmod(end_t, 60)
+                                    e_m, e_s = divmod(e_m, 60)
                                     e_h, e_m = divmod(e_m, 60)
                                     
                                     s_str = f"{int(s_h)}:{int(s_m):02d}:{int(s_s):02d}.{int((start_t%1)*100):02d}"
