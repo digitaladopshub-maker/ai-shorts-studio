@@ -104,7 +104,6 @@ if os.path.exists(video_path):
         enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
         
         if enable_subs:
-            # Layout structured so preview column aligns perfectly parallel with the Font section
             col_controls, col_preview = st.columns([1.5, 0.7])
             
             with col_controls:
@@ -172,16 +171,15 @@ if os.path.exists(video_path):
                     video_speed = st.selectbox("Video Speed (Retention)", ["1.0x (Normal)", "1.1x (Fast Viral)", "1.25x (Super Fast)"], index=0)
                     speed_val = 1.0 if "1.0x" in video_speed else (1.1 if "1.1x" in video_speed else 1.25)
 
+                # Reordered: Style and Effects moved up, Horizontal Flip moved down
                 r4_col1, r4_col2 = st.columns(2)
                 with r4_col1:
-                    enable_flip = st.checkbox("🔄 Horizontal Flip (Anti-Copyright)", value=False)
+                    clipchamp_effect = st.selectbox("✨ Style and Effects", ["None", "Soft Vignette Glow", "VHS Glitch Overlay", "Cinematic Letterbox (Cinemascope)", "Bokeh Blur Background Touch"], index=0)
                 with r4_col2:
                     color_filter = st.selectbox("Cinematic Filter", ["Normal", "Cyberpunk Glow", "High Contrast", "Warm Cinematic", "Vintage Film 70s", "HDR Vibrant"], index=0)
 
-                # Clipchamp-Style Effects Dropdown
-                clipchamp_effect = st.selectbox("✨ Clipchamp Style Effects", ["None", "Soft Vignette Glow", "VHS Glitch Overlay", "Cinematic Letterbox (Cinemascope)", "Bokeh Blur Background Touch"], index=0)
-
-                enable_face_tracking = st.checkbox("🤖 Enable Smart AI Face Tracking (Center Crop on Speaker)", value=True)
+                enable_flip = st.checkbox("🔄 Horizontal Flip (Anti-Copyright)", value=False)
+                enable_face_tracking = st.checkbox("Enable Smart AI Face Tracking", value=True)
 
                 st.markdown("---")
                 render_clicked = st.button("🚀 Render Shorts Batch Now", type="primary", use_container_width=True)
@@ -257,7 +255,7 @@ if os.path.exists(video_path):
                     wrapped_lines = textwrap.wrap(raw_text, width=14)
                     wrapped_text = "\n".join(wrapped_lines)
 
-                    # Fetch real font instance dynamically from dedicated font file
+                    # Dynamic pro font loader from fonts.py
                     font = get_pro_font(font_choice, font_size)
 
                     if "Top" in caption_align:
@@ -272,7 +270,6 @@ if os.path.exists(video_path):
                         (x_pos, y_pos), wrapped_text, font=font, fill=text_color, 
                         anchor="mm", align="center", stroke_width=3, stroke_fill=outline_color
                     )
-                    # Preview frame neatly aligned parallel to settings top
                     st.image(img, width=280, caption=f"Live Preview ({font_choice.split('.')[1].strip()})")
 
     with tab_audio:
@@ -415,7 +412,7 @@ if os.path.exists(video_path):
                                     
                                     s_m, s_s = divmod(start_t, 60)
                                     s_h, s_m = divmod(s_m, 60)
-                                    e_m, e_s = divmod(e_m, 60)
+                                    e_m, e_s = divmod(end_t, 60)
                                     e_h, e_m = divmod(e_m, 60)
                                     
                                     s_str = f"{int(s_h)}:{int(s_m):02d}:{int(s_s):02d}.{int((start_t%1)*100):02d}"
