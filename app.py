@@ -155,9 +155,9 @@ if os.path.exists(video_path):
 
         s_col3, s_col4 = st.columns(2)
         with s_col3:
-            # Default is strictly set to Medium (24px - Rec) via index=1
             font_size_option = st.selectbox("Font Size", ["Small (18px)", "Medium (24px - Rec)", "Large (32px)", "Extra Large (40px)"], index=1)
-            font_size_map = {"Small (18px)": 18, "Medium (24px - Rec)": 24, "Large (32px)": 32, "Extra Large (40px)": 40}
+            # Updated size map to ensure text is always prominent and readable
+            font_size_map = {"Small (18px)": 32, "Medium (24px - Rec)": 44, "Large (32px)": 58, "Extra Large (40px)": 72}
             font_size = font_size_map[font_size_option]
         with s_col4:
             words_per_line_option = st.selectbox("Words Per Line", ["1 Word", "2 Words (Recommended)", "3 Words", "4 Words", "5 Words"], index=1)
@@ -276,8 +276,7 @@ if os.path.exists(video_path):
             if "Hormozi" in style_preset or "Pop" in style_preset:
                 raw_text = "💥 " + raw_text
 
-            # Strict safe margin box wrapping limit so text never overflows screen
-            wrap_width = max(10, int(20 - (font_size / 3)))
+            wrap_width = max(8, int(20 - (font_size / 6)))
             wrapped_lines = textwrap.wrap(raw_text, width=wrap_width)
             wrapped_text = "\n".join(wrapped_lines)
 
@@ -295,7 +294,7 @@ if os.path.exists(video_path):
                 (x_pos, y_pos), wrapped_text, font=font, fill=text_color, 
                 anchor="mm", align="center", stroke_width=3, stroke_fill=outline_color
             )
-            st.image(img, use_container_width=True, caption=f"Live Preview | Font: {font_choice} | Safe Box Active")
+            st.image(img, use_container_width=True, caption=f"Live Preview | Font: {font_choice}")
 
     if render_clicked:
         tasks = []
@@ -379,9 +378,8 @@ if os.path.exists(video_path):
                         f.write("[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
                         
                         margin_v_val = 240 if "Bottom" in caption_align else (160 if "Top" in caption_align else 960)
-                        render_ass_fontsize = int(font_size * 2.2)
+                        render_ass_fontsize = int(font_size * 2.0)
                         
-                        # Strict 140px margins on left and right for final video rendering box
                         f.write(f"Style: Default,{ass_font_name},{render_ass_fontsize},{ass_color},&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},140,140,{margin_v_val},1\n\n")
                         f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
                         
@@ -394,7 +392,7 @@ if os.path.exists(video_path):
                                     end_t = chunk[-1]['end']
                                     raw_str = " ".join([w['word'].strip() for w in chunk]).upper()
                                     
-                                    render_wrap_width = max(10, int(18 - (font_size / 4)))
+                                    render_wrap_width = max(10, int(18 - (font_size / 6)))
                                     wrapped_chunk = textwrap.wrap(raw_str, width=render_wrap_width)
                                     text_str = "\\N".join(wrapped_chunk)
                                     
