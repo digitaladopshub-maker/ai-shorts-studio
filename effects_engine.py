@@ -1,29 +1,8 @@
-import os
-from PIL import ImageFont
-
-def get_pro_font(font_choice, font_size):
-    default_sans = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
-    default_serif = "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf"
-    default_mono = "/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf"
-    
-    choice_lower = font_choice.lower()
-    if any(x in choice_lower for x in ["serif", "playfair", "lora", "merriweather", "crimson", "cinzel"]):
-        target_path = default_serif if os.path.exists(default_serif) else default_sans
-    elif any(x in choice_lower for x in ["mono", "code", "jetbrains", "fira", "ubuntu"]):
-        target_path = default_mono if os.path.exists(default_mono) else default_sans
-    else:
-        target_path = default_sans
-
-    try:
-        return ImageFont.truetype(target_path, int(font_size * 1.6))
-    except Exception:
-        return ImageFont.load_default()
-
 def get_filter_ffmpeg_string(filter_category, filter_name):
-    if filter_name == "None":
+    if not filter_name or filter_name == "None":
         return ""
         
-    if filter_category == "High Quality & Aesthetic Filters (For Face & Body)":
+    if "High Quality" in filter_category:
         if "iPhone HD" in filter_name:
             return "eq=saturation=1.2:contrast=1.1:brightness=0.03,unsharp=5:5:1.0:3:3:0.3"
         elif "HD Glamour" in filter_name:
@@ -37,7 +16,7 @@ def get_filter_ffmpeg_string(filter_category, filter_name):
         elif "Bubblegum" in filter_name:
             return "colorbalance=rm=0.15:bm=0.15,eq=saturation=1.1"
             
-    elif filter_category == "🎬 Cinematic & Vibe Filters (For Travel & Vlogs)":
+    elif "Cinematic & Vibe" in filter_category:
         if "Cinematic Glow" in filter_name:
             return "eq=contrast=1.2:brightness=-0.02:saturation=1.1,unsharp=3:3:0.8"
         elif "Green Lake" in filter_name:
@@ -51,10 +30,10 @@ def get_filter_ffmpeg_string(filter_category, filter_name):
         elif "Cool Vibes" in filter_name:
             return "colorbalance=bm=0.3:rm=-0.15"
             
-    elif filter_category == "🤖 Viral AI & Special Effects Filters":
-        if "Thermal Effect" in filter_name:
+    elif "Viral AI" in filter_category:
+        if "Thermal" in filter_name:
             return "negate,eq=saturation=2.0"
-        elif "2016 Filter" in filter_name:
+        elif "2016" in filter_name:
             return "eq=saturation=0.7:contrast=1.1,vignette=PI/3"
         elif "Dreamy Halo" in filter_name:
             return "gblur=sigma=2.5,eq=brightness=0.05"
@@ -62,11 +41,11 @@ def get_filter_ffmpeg_string(filter_category, filter_name):
     return ""
 
 def get_style_effect_ffmpeg_string(effect_name):
-    if effect_name == "None":
+    if not effect_name or effect_name == "None":
         return ""
     elif "Cyberpunk" in effect_name:
         return "eq=saturation=1.5:contrast=1.3,colorbalance=rm=0.2:bm=0.3"
-    elif "Glitch Portrait" in effect_name:
+    elif "Glitch" in effect_name:
         return "eq=contrast=1.4:brightness=0.1,unsharp=7:7:2.0"
     elif "Blur" in effect_name:
         return "gblur=sigma=3.0"
@@ -74,7 +53,7 @@ def get_style_effect_ffmpeg_string(effect_name):
         return "crop=in_w-20:in_h-20:10+10*sin(t*20):10+10*cos(t*15)"
     elif "Flash" in effect_name:
         return "eq=brightness='if(lt(mod(t,2),0.2),0.4,0)'"
-    elif "Soft Vignette Glow" in effect_name:
+    elif "Soft Vignette" in effect_name:
         return "vignette=PI/4"
     elif "VHS Glitch" in effect_name:
         return "eq=contrast=1.3:saturation=0.6,noise=alls=20:allf=t+u"
