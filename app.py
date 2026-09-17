@@ -15,6 +15,10 @@ st.caption("Free for every one")
 if 'frame_time' not in st.session_state:
     st.session_state.frame_time = "0"
 
+# Reset state initialization
+if 'reset_trigger' not in st.session_state:
+    st.session_state.reset_trigger = 0
+
 video_path = "input_video.mp4"
 preview_path = "preview_frame.jpg"
 bg_music_path = "bg_music.mp3"
@@ -98,177 +102,46 @@ with st.sidebar:
             st.info("AI poori video ko process karke 3 clips cut karega.")
 
 if os.path.exists(video_path):
-    tab_subs, tab_audio = st.tabs(["✍️ Ultimate Subtitle Studio", "🎵 Audio & Background Music"])
+    col_controls, col_preview = st.columns([1.4, 0.8])
     
-    with tab_subs:
-        enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
-        
-        if enable_subs:
-            col_controls, col_preview = st.columns([1.5, 0.7])
-            
-            with col_controls:
-                # Subtitle Preset categorized selection
-                style_preset = st.selectbox("Subtitle Preset", [
-                    "--- Word-by-Word Pop & Highlight Styles ---",
-                    "The Alex Hormozi Style",
-                    "Border Pop-Up",
-                    "Karaoke Highlight",
-                    "The Power Word Scale",
-                    "Glow & Shine Effect",
-                    "--- Modern & Aesthetic Subtitle Blocks ---",
-                    "The Minimal Subtitle Block",
-                    "Apple Style Minimal",
-                    "The Gradient Premium Stack",
-                    "Real Estate Pro",
-                    "The 3D Viral Text",
-                    "--- Animated & Dynamic Transitions ---",
-                    "Multiple Word Slide Up",
-                    "Typewriter Effect",
-                    "Flicker Text",
-                    "Wave In / Bounce",
-                    "Blur Fade In",
-                    "--- Social Media & Auto-Emoji Captions ---",
-                    "Auto-Emoji Pop",
-                    "TikTok Classic Style",
-                    "Sound Effects Bracket",
-                    "CapCut Auto Lyric Template",
-                    "The Cyberpunk Neon"
-                ], index=1)
+    with col_controls:
+        # --- SECTION 1: VIDEO & FILTERS ---
+        st.markdown("### 🎥 1. Video & Effects")
+        filter_category = st.selectbox("Filter Category", [
+            "High Quality & Aesthetic Filters (For Face & Body)",
+            "🎬 Cinematic & Vibe Filters (For Travel & Vlogs)",
+            "🤖 Viral AI & Special Effects Filters"
+        ], index=0, key=f"fc_{st.session_state.reset_trigger}")
 
-                r1_col1, r1_col2 = st.columns(2)
-                with r1_col1:
-                    font_choice = st.selectbox("Font", [
-                        "1. Montserrat Black", "2. Impact Pro", "3. Arial Black", "4. Comic Neue Bold",
-                        "5. Trebuchet MS Bold", "6. Ubuntu Bold", "7. Liberation Sans Bold", "8. DejaVu Sans Bold",
-                        "9. Inter Heavy", "10. Roboto Black", "11. Poppins ExtraBold (Viral)", "12. Oswald Bold",
-                        "13. Anton Regular", "14. Bebas Neue Pro", "15. Nunito ExtraBold", "16. Raleway Black",
-                        "17. Quicksand Bold", "18. Playfair Display Bold", "19. Merriweather Bold", "20. Fira Code Bold",
-                        "21. JetBrains Mono Bold", "22. Space Grotesk Bold", "23. Syne ExtraBold", "24. DM Sans Bold",
-                        "25. Work Sans Black", "26. PT Sans Bold", "27. Open Sans ExtraBold", "28. Lora Bold",
-                        "29. Crimson Text Bold", "30. Cinzel Bold", "31. Archivo Black", "32. Cabin Bold",
-                        "33. Mulish ExtraBold", "34. Barlow Condensed Bold", "35. Kanit Bold", "36. Prompt Bold",
-                        "37. Sriracha Bold", "38. Caveat Bold", "39. Pacifico Pro", "40. Lobster Two",
-                        "41. Bangers Regular", "42. Fredoka One", "43. Titan One", "44. Luckiest Guy",
-                        "45. Chewy Regular", "46. Permanent Marker", "47. Amatic SC Bold", "48. Shadows Into Light",
-                        "49. Righteous Regular", "50. Bungee Inline"
-                    ], index=10)
+        if filter_category == "High Quality & Aesthetic Filters (For Face & Body)":
+            specific_filter = st.selectbox("Select Filter", ["None", "iPhone HD", "HD Glamour Filter", "Flash CCD", "Universal Sunset", "Bold Glamour", "Bubblegum"], index=0, key=f"sf1_{st.session_state.reset_trigger}")
+        elif filter_category == "🎬 Cinematic & Vibe Filters (For Travel & Vlogs)":
+            specific_filter = st.selectbox("Select Filter", ["None", "Cinematic Glow / HD", "Green Lake", "Renoir / Reno", "Moon Rise", "Bad Bunny", "Cool Vibes"], index=0, key=f"sf2_{st.session_state.reset_trigger}")
+        else:
+            specific_filter = st.selectbox("Select Filter", ["None", "Cartoon Filter AI", "Barbie Girl AI / Princess", "Kid Teen Now Aged", "Falling Filter", "2016 Filter", "Velocity x Color AD", "Thermal Effect", "Dreamy Halo"], index=0, key=f"sf3_{st.session_state.reset_trigger}")
 
-                with r1_col2:
-                    caption_align = st.selectbox("Position", [
-                        "Bottom (Safe Zone)", 
-                        "Middle-Center", 
-                        "Top (Safe Zone)"
-                    ], index=0)
+        style_effect = st.selectbox("Style and Effects", [
+            "None",
+            "AI Autofill", "Velocity (Auto Velocity)", "3D Zoom Pro", "AI Manga / Anime", "Cyberpunk / Neon Style", "Face Ageing (Old Age)", "Glitch Portrait",
+            "Glowing Lines", "Angel Wings / Demon Wings", "Lightning Eyes (Laser Eyes)", "Blur / Halo Blur", "Electro-Optical Face",
+            "Camera Shake", "Rebound Swing", "Flash / Black Flash", "Horizontal Shake / Jiggle", "Soft Vignette Glow", "VHS Glitch Overlay", "Cinematic Letterbox (Cinemascope)"
+        ], index=0, key=f"se_{st.session_state.reset_trigger}")
 
-                r2_col1, r2_col2 = st.columns(2)
-                with r2_col1:
-                    font_size_option = st.selectbox("Font Size", ["Small (18px)", "Medium (24px - Rec)", "Large (32px)", "Extra Large (40px)"], index=1)
-                    font_size_map = {"Small (18px)": 18, "Medium (24px - Rec)": 24, "Large (32px)": 32, "Extra Large (40px)": 40}
-                    font_size = font_size_map[font_size_option]
-                with r2_col2:
-                    words_per_line_option = st.selectbox("Words Per Line", ["1 Word", "2 Words (Recommended)", "3 Words", "4 Words", "5 Words"], index=1)
-                    wpl_map = {"1 Word": 1, "2 Words (Recommended)": 2, "3 Words": 3, "4 Words": 4, "5 Words": 5}
-                    words_per_line = wpl_map[words_per_line_option]
+        v_col1, v_col2 = st.columns(2)
+        with v_col1:
+            enable_flip = st.checkbox("🔄 Horizontal Flip", value=False, key=f"flp_{st.session_state.reset_trigger}")
+        with v_col2:
+            video_speed = st.selectbox("Video Speed", ["1.0x (Normal)", "1.1x (Fast Viral)", "1.25x (Super Fast)"], index=0, key=f"spd_{st.session_state.reset_trigger}")
+            speed_val = 1.0 if "1.0x" in video_speed else (1.1 if "1.1x" in video_speed else 1.25)
 
-                r3_col1, r3_col2 = st.columns(2)
-                with r3_col1:
-                    video_speed = st.selectbox("Video Speed (Retention)", ["1.0x (Normal)", "1.1x (Fast Viral)", "1.25x (Super Fast)"], index=0)
-                    speed_val = 1.0 if "1.0x" in video_speed else (1.1 if "1.1x" in video_speed else 1.25)
-                with r3_col2:
-                    # Cinematic Filters Categorized Selection
-                    filter_category = st.selectbox("Filter Category", [
-                        "High Quality & Aesthetic Filters (For Face & Body)",
-                        "🎬 Cinematic & Vibe Filters (For Travel & Vlogs)",
-                        "🤖 Viral AI & Special Effects Filters"
-                    ], index=0)
+        if st.button("🔄 Reset Video Filters & Effects"):
+            st.session_state.reset_trigger += 1
+            st.rerun()
 
-                if filter_category == "High Quality & Aesthetic Filters (For Face & Body)":
-                    specific_filter = st.selectbox("Select Filter", ["iPhone HD", "HD Glamour Filter", "Flash CCD", "Universal Sunset", "Bold Glamour", "Bubblegum"], index=0)
-                elif filter_category == "🎬 Cinematic & Vibe Filters (For Travel & Vlogs)":
-                    specific_filter = st.selectbox("Select Filter", ["Cinematic Glow / HD", "Green Lake", "Renoir / Reno", "Moon Rise", "Bad Bunny", "Cool Vibes"], index=0)
-                else:
-                    specific_filter = st.selectbox("Select Filter", ["Cartoon Filter AI", "Barbie Girl AI / Princess", "Kid Teen Now Aged", "Falling Filter", "2016 Filter", "Velocity x Color AD", "Thermal Effect", "Dreamy Halo"], index=0)
+        st.markdown("---")
 
-                r4_col1, r4_col2 = st.columns(2)
-                with r4_col1:
-                    style_effect = st.selectbox("Style and Effects", [
-                        "None",
-                        "AI Autofill", "Velocity (Auto Velocity)", "3D Zoom Pro", "AI Manga / Anime", "Cyberpunk / Neon Style", "Face Ageing (Old Age)", "Glitch Portrait",
-                        "Glowing Lines", "Angel Wings / Demon Wings", "Lightning Eyes (Laser Eyes)", "Blur / Halo Blur", "Electro-Optical Face",
-                        "Camera Shake", "Rebound Swing", "Flash / Black Flash", "Horizontal Shake / Jiggle", "Soft Vignette Glow", "VHS Glitch Overlay", "Cinematic Letterbox (Cinemascope)"
-                    ], index=0)
-                with r4_col2:
-                    enable_flip = st.checkbox("🔄 Horizontal Flip (Anti-Copyright)", value=False)
-
-                enable_face_tracking = st.checkbox("Enable Smart AI Face Tracking", value=True)
-
-                st.markdown("---")
-                render_clicked = st.button("🚀 Render Shorts Batch Now", type="primary", use_container_width=True)
-
-            with col_preview:
-                target_time = clip_ranges[0][0] if (clip_mode == "Manual Timestamps (Precise)" and clip_ranges) else "0"
-                
-                vf_parts = []
-                if enable_face_tracking:
-                    f_x = detect_face_center(video_path, target_time)
-                    if f_x:
-                        vf_parts.append(f"crop=ih*9/16:ih:clamp(x={f_x}-ih*9/32\\,0\\,in_w-ih*9/16):0")
-                    else:
-                        vf_parts.append("crop=ih*9/16:ih")
-                else:
-                    vf_parts.append("crop=ih*9/16:ih")
-
-                if enable_flip:
-                    vf_parts.append("hflip")
-                
-                # Active filter application
-                f_str = get_filter_ffmpeg_string(filter_category, specific_filter)
-                if f_str:
-                    vf_parts.append(f_str)
-
-                # Active style & effect application
-                e_str = get_style_effect_ffmpeg_string(style_effect)
-                if e_str:
-                    vf_parts.append(e_str)
-
-                vf_parts.append("scale=540:960")
-                vf_preview_str = ",".join(vf_parts)
-
-                subprocess.run(
-                    f'ffmpeg -y -ss {target_time} -i "{video_path}" -vframes 1 -vf "{vf_preview_str}" "{preview_path}"', 
-                    shell=True, capture_output=True
-                )
-                
-                if os.path.exists(preview_path):
-                    img = Image.open(preview_path)
-                    draw = ImageDraw.Draw(img)
-                    
-                    text_color, outline_color = ("#FFFF00", "#000000") if "Hormozi" in style_preset else ("#FFFFFF", "#000000")
-                    w, h = img.size
-                    sample_words = ["CLIPPING", "PREVIEW", "TEXT"]
-                    raw_text = " ".join(sample_words[:words_per_line])
-                    
-                    wrapped_lines = textwrap.wrap(raw_text, width=14)
-                    wrapped_text = "\n".join(wrapped_lines)
-
-                    font = get_pro_font(font_choice, font_size)
-
-                    if "Top" in caption_align:
-                        y_pos = int(h * 0.18)
-                    elif "Middle-Center" in caption_align:
-                        y_pos = int(h * 0.5)
-                    else:
-                        y_pos = int(h - 260)
-
-                    x_pos = int(w / 2)
-                    draw.multiline_text(
-                        (x_pos, y_pos), wrapped_text, font=font, fill=text_color, 
-                        anchor="mm", align="center", stroke_width=3, stroke_fill=outline_color
-                    )
-                    st.image(img, width=280, caption=f"Live Preview ({font_choice.split('.')[1].strip()})")
-
-    with tab_audio:
-        st.subheader("🎵 Background Music & Audio Mixing (Percentage System)")
+        # --- SECTION 2: AUDIO & BACKGROUND ---
+        st.markdown("### 🎵 2. Audio & Background Music")
         enable_bg_music = st.checkbox("Add Background Music Track?", value=False)
         bg_music_file = None
         if enable_bg_music:
@@ -279,13 +152,157 @@ if os.path.exists(video_path):
                 st.success("Background Music Loaded!")
                 bg_music_file = bg_music_path
 
-            col_vol1, col_vol2 = st.columns(2)
-            with col_vol1:
+            ac1, ac2 = st.columns(2)
+            with ac1:
                 orig_vol_pct = st.slider("Original Voice Volume (%)", min_value=0, max_value=200, value=100, step=5)
                 orig_vol = orig_vol_pct / 100.0
-            with col_vol2:
+            with ac2:
                 bg_vol_pct = st.slider("Background Music Volume (%)", min_value=0, max_value=100, value=15, step=1)
                 bg_vol = bg_vol_pct / 100.0
+
+        st.markdown("---")
+
+        # --- SECTION 3: SUBTITLE PRESET & STYLING ---
+        st.markdown("### ✍️ 3. Subtitle Preset & Styling")
+        enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
+        
+        style_preset = st.selectbox("Subtitle Preset", [
+            "The Alex Hormozi Style",
+            "Border Pop-Up",
+            "Karaoke Highlight",
+            "The Power Word Scale",
+            "Glow & Shine Effect",
+            "The Minimal Subtitle Block",
+            "Apple Style Minimal",
+            "The Gradient Premium Stack",
+            "Real Estate Pro",
+            "The 3D Viral Text",
+            "Multiple Word Slide Up",
+            "Typewriter Effect",
+            "Flicker Text",
+            "Wave In / Bounce",
+            "Blur Fade In",
+            "Auto-Emoji Pop",
+            "TikTok Classic Style",
+            "Sound Effects Bracket",
+            "CapCut Auto Lyric Template",
+            "The Cyberpunk Neon"
+        ], index=0)
+
+        s_col1, s_col2 = st.columns(2)
+        with s_col1:
+            font_choice = st.selectbox("Font", [
+                "1. Montserrat Black", "2. Impact Pro", "3. Arial Black", "4. Comic Neue Bold",
+                "5. Trebuchet MS Bold", "6. Ubuntu Bold", "7. Liberation Sans Bold", "8. DejaVu Sans Bold",
+                "9. Inter Heavy", "10. Roboto Black", "11. Poppins ExtraBold (Viral)", "12. Oswald Bold",
+                "13. Anton Regular", "14. Bebas Neue Pro", "15. Nunito ExtraBold", "16. Raleway Black",
+                "17. Quicksand Bold", "18. Playfair Display Bold", "19. Merriweather Bold", "20. Fira Code Bold",
+                "21. JetBrains Mono Bold", "22. Space Grotesk Bold", "23. Syne ExtraBold", "24. DM Sans Bold",
+                "25. Work Sans Black", "26. PT Sans Bold", "27. Open Sans ExtraBold", "28. Lora Bold",
+                "29. Crimson Text Bold", "30. Cinzel Bold", "31. Archivo Black", "32. Cabin Bold",
+                "33. Mulish ExtraBold", "34. Barlow Condensed Bold", "35. Kanit Bold", "36. Prompt Bold",
+                "37. Sriracha Bold", "38. Caveat Bold", "39. Pacifico Pro", "40. Lobster Two",
+                "41. Bangers Regular", "42. Fredoka One", "43. Titan One", "44. Luckiest Guy",
+                "45. Chewy Regular", "46. Permanent Marker", "47. Amatic SC Bold", "48. Shadows Into Light",
+                "49. Righteous Regular", "50. Bungee Inline"
+            ], index=10)
+        with s_col2:
+            caption_align = st.selectbox("Position", [
+                "Bottom (Safe Zone)", 
+                "Middle-Center", 
+                "Top (Safe Zone)"
+            ], index=0)
+
+        s_col3, s_col4 = st.columns(2)
+        with s_col3:
+            font_size_option = st.selectbox("Font Size", ["Small (18px)", "Medium (24px - Rec)", "Large (32px)", "Extra Large (40px)"], index=1)
+            font_size_map = {"Small (18px)": 18, "Medium (24px - Rec)": 24, "Large (32px)": 32, "Extra Large (40px)": 40}
+            font_size = font_size_map[font_size_option]
+        with s_col4:
+            words_per_line_option = st.selectbox("Words Per Line", ["1 Word", "2 Words (Recommended)", "3 Words", "4 Words", "5 Words"], index=1)
+            wpl_map = {"1 Word": 1, "2 Words (Recommended)": 2, "3 Words": 3, "4 Words": 4, "5 Words": 5}
+            words_per_line = wpl_map[words_per_line_option]
+
+        st.markdown("---")
+        enable_face_tracking = st.checkbox("Enable Smart AI Face Tracking", value=True)
+
+        render_clicked = st.button("🚀 Render Shorts Batch Now", type="primary", use_container_width=True)
+
+    with col_preview:
+        st.markdown("### 🖼️ Live Preview")
+        target_time = clip_ranges[0][0] if (clip_mode == "Manual Timestamps (Precise)" and clip_ranges) else "0"
+        
+        vf_parts = []
+        if enable_face_tracking:
+            f_x = detect_face_center(video_path, target_time)
+            if f_x:
+                vf_parts.append(f"crop=ih*9/16:ih:clamp(x={f_x}-ih*9/32\\,0\\,in_w-ih*9/16):0")
+            else:
+                vf_parts.append("crop=ih*9/16:ih")
+        else:
+            vf_parts.append("crop=ih*9/16:ih")
+
+        if enable_flip:
+            vf_parts.append("hflip")
+        
+        f_str = get_filter_ffmpeg_string(filter_category, specific_filter)
+        if f_str:
+            vf_parts.append(f_str)
+
+        e_str = get_style_effect_ffmpeg_string(style_effect)
+        if e_str:
+            vf_parts.append(e_str)
+
+        vf_parts.append("scale=540:960")
+        vf_preview_str = ",".join(vf_parts)
+
+        subprocess.run(
+            f'ffmpeg -y -ss {target_time} -i "{video_path}" -vframes 1 -vf "{vf_preview_str}" "{preview_path}"', 
+            shell=True, capture_output=True
+        )
+        
+        if os.path.exists(preview_path):
+            img = Image.open(preview_path)
+            draw = ImageDraw.Draw(img)
+            
+            # Styling based on preset selection
+            if "Hormozi" in style_preset or "Neon" in style_preset or "Glow" in style_preset:
+                text_color, outline_color = "#FFFF00", "#000000"
+            elif "Minimal" in style_preset or "Apple" in style_preset:
+                text_color, outline_color = "#FFFFFF", "#000000"
+            elif "Gradient" in style_preset or "3D" in style_preset:
+                text_color, outline_color = "#00FFFF", "#000066"
+            elif "Alert" in style_preset or "Firecracker" in style_preset:
+                text_color, outline_color = "#FF0000", "#FFFFFF"
+            else:
+                text_color, outline_color = "#FFFF00", "#000000"
+
+            w, h = img.size
+            sample_words = ["CLIPPING", "PREVIEW", "VIRAL"]
+            raw_text = " ".join(sample_words[:words_per_line])
+            
+            if "Hormozi" in style_preset or "Pop" in style_preset:
+                raw_text = "💥 " + raw_text
+
+            wrapped_lines = textwrap.wrap(raw_text, width=14)
+            wrapped_text = "\n".join(wrapped_lines)
+
+            font = get_pro_font(font_choice, font_size)
+
+            if "Top" in caption_align:
+                y_pos = int(h * 0.18)
+            elif "Middle-Center" in caption_align:
+                y_pos = int(h * 0.5)
+            else:
+                y_pos = int(h - 260)
+
+            x_pos = int(w / 2)
+            draw.multiline_text(
+                (x_pos, y_pos), wrapped_text, font=font, fill=text_color, 
+                anchor="mm", align="center", stroke_width=3, stroke_fill=outline_color
+            )
+            # Expanded preview size to span well alongside the sections
+            st.image(img, use_container_width=True, caption=f"Live Preview | Preset: {style_preset}")
 
     if render_clicked:
         tasks = []
@@ -358,7 +375,7 @@ if os.path.exists(video_path):
                     align_map = {"Top (Safe Zone)": "6", "Middle-Center": "5", "Bottom (Safe Zone)": "2"}
                     align_val = align_map[caption_align]
                     
-                    ass_color = "&H0000FFFF" if "Hormozi" in style_preset else "&H00FFFFFF"
+                    ass_color = "&H0000FFFF" if ("Hormozi" in style_preset or "Neon" in style_preset) else "&H00FFFFFF"
                     ass_font_name = "Liberation Sans"
 
                     result = model.transcribe(cropped_file, word_timestamps=True)
@@ -393,7 +410,7 @@ if os.path.exists(video_path):
                                     s_str = f"{int(s_h)}:{int(s_m):02d}:{int(s_s):02d}.{int((start_t%1)*100):02d}"
                                     e_str = f"{int(e_h)}:{int(e_m):02d}:{int(e_s):02d}.{int((end_t%1)*100):02d}"
                                     
-                                    anim_tag = r"{\t(0,80,\fscx115\fscy115)\t(80,160,\fscx100\fscy100)}" if "Hormozi" in style_preset else ""
+                                    anim_tag = r"{\t(0,80,\fscx115\fscy115)\t(80,160,\fscx100\fscy100)}" if ("Hormozi" in style_preset or "Pop" in style_preset) else ""
                                         
                                     f.write(f"Dialogue: 0,{s_str},{e_str},Default,,0,0,0,,{anim_tag}{text_str}\n")
 
