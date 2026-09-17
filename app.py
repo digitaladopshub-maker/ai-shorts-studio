@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 st.set_page_config(page_title="Pro Shorts Studio", layout="wide", initial_sidebar_state="expanded")
 
-st.title("🎬 Smart Pro AI Shorts Studio - Phase 3 (Cloud Live + Face Tracking)")
+st.title("🎬 Smart Pro AI Shorts Studio - Phase 3 (Percentage Audio)")
 st.caption("Commercial-Grade AI Vertical Video, Subtitle, Face Tracking & Audio Generator")
 
 if 'frame_time' not in st.session_state:
@@ -194,7 +194,7 @@ if os.path.exists(video_path):
                     st.image(img, caption=f"Live Subtitle Preview (Frame at {target_time}s)", use_container_width=True)
 
     with tab_audio:
-        st.subheader("🎵 Background Music & Audio Mixing")
+        st.subheader("🎵 Background Music & Audio Mixing (Percentage System)")
         enable_bg_music = st.checkbox("Add Background Music Track?", value=False)
         bg_music_file = None
         if enable_bg_music:
@@ -207,9 +207,12 @@ if os.path.exists(video_path):
 
             col_vol1, col_vol2 = st.columns(2)
             with col_vol1:
-                orig_vol = st.slider("Original Voice Volume", min_value=0.1, max_value=2.0, value=1.0, step=0.1)
+                # Percentage Sliders: 0% to 200% for voice, 0% to 100% for background music
+                orig_vol_pct = st.slider("Original Voice Volume (%)", min_value=0, max_value=200, value=100, step=5)
+                orig_vol = orig_vol_pct / 100.0
             with col_vol2:
-                bg_vol = st.slider("Background Music Volume", min_value=0.01, max_value=0.5, value=0.1, step=0.01)
+                bg_vol_pct = st.slider("Background Music Volume (%)", min_value=0, max_value=100, value=15, step=1)
+                bg_vol = bg_vol_pct / 100.0
 
     st.markdown("---")
     if st.button("🚀 Render Shorts Batch Now", type="primary", use_container_width=True):
@@ -227,12 +230,11 @@ if os.path.exists(video_path):
         model = whisper.load_model("base") if enable_subs else None
         generated_clips = []
 
-        with st.spinner("Processing High-Quality Shorts with AI Engine & Face Tracking..."):
+        with st.spinner("Processing High-Quality Shorts with AI Engine & Audio Percentages..."):
             for clip_num, start_sec, duration_sec in tasks:
                 cropped_file = f"cropped_{clip_num}.mp4"
                 final_file = f"final_short_{clip_num}.mp4"
                 
-                # Face Tracking Integration for Final Render
                 vf_crop_hd = "crop=ih*9/16:ih,scale=1080:1920"
                 if enable_face_tracking:
                     f_x = detect_face_center(video_path, start_sec)
