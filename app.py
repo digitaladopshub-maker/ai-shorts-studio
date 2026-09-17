@@ -6,6 +6,7 @@ import textwrap
 import cv2
 from PIL import Image, ImageDraw
 from effects_engine import get_pro_font, get_filter_ffmpeg_string, get_style_effect_ffmpeg_string
+from subtitle_engine import get_subtitle_styling
 
 st.set_page_config(page_title="Clipping", layout="wide", initial_sidebar_state="expanded")
 
@@ -104,7 +105,7 @@ if os.path.exists(video_path):
     col_controls, col_preview = st.columns([1.4, 0.8])
     
     with col_controls:
-        # --- SECTION 1: SUBTITLE SETTING (Shifted Up) ---
+        # --- SECTION 1: SUBTITLE SETTING ---
         st.markdown("### ✍️ Subtitle Setting")
         enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
         
@@ -182,7 +183,6 @@ if os.path.exists(video_path):
         else:
             specific_filter_options = ["None", "Cartoon Filter AI", "Barbie Girl AI / Princess", "Kid Teen Now Aged", "Falling Filter", "2016 Filter", "Velocity x Color AD", "Thermal Effect", "Dreamy Halo"]
 
-        # Select Filter and Style and Effects placed side-by-side (amne-samne)
         f_col1, f_col2 = st.columns(2)
         with f_col1:
             specific_filter = st.selectbox("Select Filter", specific_filter_options, index=0, key=f"sf_{st.session_state.reset_trigger}")
@@ -207,7 +207,7 @@ if os.path.exists(video_path):
 
         st.markdown("---")
 
-        # --- SECTION 3: AUDIO SETTING (Shifted Down) ---
+        # --- SECTION 3: AUDIO SETTING ---
         st.markdown("### 🎵 Audio Setting")
         enable_bg_music = st.checkbox("Add Background Music Track?", value=False)
         bg_music_file = None
@@ -269,22 +269,14 @@ if os.path.exists(video_path):
             img = Image.open(preview_path)
             draw = ImageDraw.Draw(img)
             
-            if "Hormozi" in style_preset or "Neon" in style_preset or "Glow" in style_preset:
-                text_color, outline_color = "#FFFF00", "#000000"
-            elif "Minimal" in style_preset or "Apple" in style_preset:
-                text_color, outline_color = "#FFFFFF", "#000000"
-            elif "Gradient" in style_preset or "3D" in style_preset:
-                text_color, outline_color = "#00FFFF", "#000066"
-            elif "Alert" in style_preset or "Firecracker" in style_preset:
-                text_color, outline_color = "#FF0000", "#FFFFFF"
-            else:
-                text_color, outline_color = "#FFFF00", "#000000"
+            # Fetch exact active styling from subtitle_engine
+            text_color, outline_color, has_box, anim_type, _ = get_subtitle_styling(style_preset)
 
             w, h = img.size
             sample_words = ["CLIPPING", "PREVIEW", "VIRAL"]
             raw_text = " ".join(sample_words[:words_per_line])
             
-            if "Hormozi" in style_preset or "Pop" in style_preset:
+            if "Pop" in anim_type or "Hormozi" in style_preset:
                 raw_text = "💥 " + raw_text
 
             wrapped_lines = textwrap.wrap(raw_text, width=14)
@@ -377,7 +369,7 @@ if os.path.exists(video_path):
                     align_map = {"Top (Safe Zone)": "6", "Middle-Center": "5", "Bottom (Safe Zone)": "2"}
                     align_val = align_map[caption_align]
                     
-                    ass_color = "&H0000FFFF" if ("Hormozi" in style_preset or "Neon" in style_preset) else "&H00FFFFFF"
+                    _, _, _, anim_type, ass_color = get_subtitle_styling(style_preset)
                     ass_font_name = "Liberation Sans"
 
                     result = model.transcribe(cropped_file, word_timestamps=True)
@@ -412,7 +404,7 @@ if os.path.exists(video_path):
                                     s_str = f"{int(s_h)}:{int(s_m):02d}:{int(s_s):02d}.{int((start_t%1)*100):02d}"
                                     e_str = f"{int(e_h)}:{int(e_m):02d}:{int(e_s):02d}.{int((end_t%1)*100):02d}"
                                     
-                                    anim_tag = r"{\t(0,80,\fscx115\fscy115)\t(80,160,\fscx100\fscy100)}" if ("Hormozi" in style_preset or "Pop" in style_preset) else ""
+                                    anim_tag = r"{\t(0,80,\fscx115\fscy115)\t(80,160,\fscx100\fscy100)}" if "Pop" in anim_type else ""
                                         
                                     f.write(f"Dialogue: 0,{s_str},{e_str},Default,,0,0,0,,{anim_tag}{text_str}\n")
 
