@@ -15,7 +15,6 @@ st.caption("Free for every one")
 if 'frame_time' not in st.session_state:
     st.session_state.frame_time = "0"
 
-# Reset state initialization
 if 'reset_trigger' not in st.session_state:
     st.session_state.reset_trigger = 0
 
@@ -105,65 +104,8 @@ if os.path.exists(video_path):
     col_controls, col_preview = st.columns([1.4, 0.8])
     
     with col_controls:
-        # --- SECTION 1: VIDEO & FILTERS ---
-        st.markdown("### 🎥 1. Video & Effects")
-        filter_category = st.selectbox("Filter Category", [
-            "High Quality & Aesthetic Filters (For Face & Body)",
-            "🎬 Cinematic & Vibe Filters (For Travel & Vlogs)",
-            "🤖 Viral AI & Special Effects Filters"
-        ], index=0, key=f"fc_{st.session_state.reset_trigger}")
-
-        if filter_category == "High Quality & Aesthetic Filters (For Face & Body)":
-            specific_filter = st.selectbox("Select Filter", ["None", "iPhone HD", "HD Glamour Filter", "Flash CCD", "Universal Sunset", "Bold Glamour", "Bubblegum"], index=0, key=f"sf1_{st.session_state.reset_trigger}")
-        elif filter_category == "🎬 Cinematic & Vibe Filters (For Travel & Vlogs)":
-            specific_filter = st.selectbox("Select Filter", ["None", "Cinematic Glow / HD", "Green Lake", "Renoir / Reno", "Moon Rise", "Bad Bunny", "Cool Vibes"], index=0, key=f"sf2_{st.session_state.reset_trigger}")
-        else:
-            specific_filter = st.selectbox("Select Filter", ["None", "Cartoon Filter AI", "Barbie Girl AI / Princess", "Kid Teen Now Aged", "Falling Filter", "2016 Filter", "Velocity x Color AD", "Thermal Effect", "Dreamy Halo"], index=0, key=f"sf3_{st.session_state.reset_trigger}")
-
-        style_effect = st.selectbox("Style and Effects", [
-            "None",
-            "AI Autofill", "Velocity (Auto Velocity)", "3D Zoom Pro", "AI Manga / Anime", "Cyberpunk / Neon Style", "Face Ageing (Old Age)", "Glitch Portrait",
-            "Glowing Lines", "Angel Wings / Demon Wings", "Lightning Eyes (Laser Eyes)", "Blur / Halo Blur", "Electro-Optical Face",
-            "Camera Shake", "Rebound Swing", "Flash / Black Flash", "Horizontal Shake / Jiggle", "Soft Vignette Glow", "VHS Glitch Overlay", "Cinematic Letterbox (Cinemascope)"
-        ], index=0, key=f"se_{st.session_state.reset_trigger}")
-
-        v_col1, v_col2 = st.columns(2)
-        with v_col1:
-            enable_flip = st.checkbox("🔄 Horizontal Flip", value=False, key=f"flp_{st.session_state.reset_trigger}")
-        with v_col2:
-            video_speed = st.selectbox("Video Speed", ["1.0x (Normal)", "1.1x (Fast Viral)", "1.25x (Super Fast)"], index=0, key=f"spd_{st.session_state.reset_trigger}")
-            speed_val = 1.0 if "1.0x" in video_speed else (1.1 if "1.1x" in video_speed else 1.25)
-
-        if st.button("🔄 Reset Video Filters & Effects"):
-            st.session_state.reset_trigger += 1
-            st.rerun()
-
-        st.markdown("---")
-
-        # --- SECTION 2: AUDIO & BACKGROUND ---
-        st.markdown("### 🎵 2. Audio & Background Music")
-        enable_bg_music = st.checkbox("Add Background Music Track?", value=False)
-        bg_music_file = None
-        if enable_bg_music:
-            uploaded_music = st.file_uploader("Upload Background MP3 Audio File", type=["mp3", "wav"])
-            if uploaded_music is not None:
-                with open(bg_music_path, "wb") as f:
-                    f.write(uploaded_music.getbuffer())
-                st.success("Background Music Loaded!")
-                bg_music_file = bg_music_path
-
-            ac1, ac2 = st.columns(2)
-            with ac1:
-                orig_vol_pct = st.slider("Original Voice Volume (%)", min_value=0, max_value=200, value=100, step=5)
-                orig_vol = orig_vol_pct / 100.0
-            with ac2:
-                bg_vol_pct = st.slider("Background Music Volume (%)", min_value=0, max_value=100, value=15, step=1)
-                bg_vol = bg_vol_pct / 100.0
-
-        st.markdown("---")
-
-        # --- SECTION 3: SUBTITLE PRESET & STYLING ---
-        st.markdown("### ✍️ 3. Subtitle Preset & Styling")
+        # --- SECTION 1: SUBTITLE SETTING (Shifted Up) ---
+        st.markdown("### ✍️ Subtitle Setting")
         enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
         
         style_preset = st.selectbox("Subtitle Preset", [
@@ -224,6 +166,68 @@ if os.path.exists(video_path):
             words_per_line = wpl_map[words_per_line_option]
 
         st.markdown("---")
+
+        # --- SECTION 2: VIDEO SETTING ---
+        st.markdown("### 🎥 Video Setting")
+        filter_category = st.selectbox("Filter Category", [
+            "High Quality & Aesthetic Filters (For Face & Body)",
+            "🎬 Cinematic & Vibe Filters (For Travel & Vlogs)",
+            "🤖 Viral AI & Special Effects Filters"
+        ], index=0, key=f"fc_{st.session_state.reset_trigger}")
+
+        if filter_category == "High Quality & Aesthetic Filters (For Face & Body)":
+            specific_filter_options = ["None", "iPhone HD", "HD Glamour Filter", "Flash CCD", "Universal Sunset", "Bold Glamour", "Bubblegum"]
+        elif filter_category == "🎬 Cinematic & Vibe Filters (For Travel & Vlogs)":
+            specific_filter_options = ["None", "Cinematic Glow / HD", "Green Lake", "Renoir / Reno", "Moon Rise", "Bad Bunny", "Cool Vibes"]
+        else:
+            specific_filter_options = ["None", "Cartoon Filter AI", "Barbie Girl AI / Princess", "Kid Teen Now Aged", "Falling Filter", "2016 Filter", "Velocity x Color AD", "Thermal Effect", "Dreamy Halo"]
+
+        # Select Filter and Style and Effects placed side-by-side (amne-samne)
+        f_col1, f_col2 = st.columns(2)
+        with f_col1:
+            specific_filter = st.selectbox("Select Filter", specific_filter_options, index=0, key=f"sf_{st.session_state.reset_trigger}")
+        with f_col2:
+            style_effect = st.selectbox("Style and Effects", [
+                "None",
+                "AI Autofill", "Velocity (Auto Velocity)", "3D Zoom Pro", "AI Manga / Anime", "Cyberpunk / Neon Style", "Face Ageing (Old Age)", "Glitch Portrait",
+                "Glowing Lines", "Angel Wings / Demon Wings", "Lightning Eyes (Laser Eyes)", "Blur / Halo Blur", "Electro-Optical Face",
+                "Camera Shake", "Rebound Swing", "Flash / Black Flash", "Horizontal Shake / Jiggle", "Soft Vignette Glow", "VHS Glitch Overlay", "Cinematic Letterbox (Cinemascope)"
+            ], index=0, key=f"se_{st.session_state.reset_trigger}")
+
+        v_col1, v_col2 = st.columns(2)
+        with v_col1:
+            enable_flip = st.checkbox("🔄 Horizontal Flip", value=False, key=f"flp_{st.session_state.reset_trigger}")
+        with v_col2:
+            video_speed = st.selectbox("Video Speed", ["1.0x (Normal)", "1.1x (Fast Viral)", "1.25x (Super Fast)"], index=0, key=f"spd_{st.session_state.reset_trigger}")
+            speed_val = 1.0 if "1.0x" in video_speed else (1.1 if "1.1x" in video_speed else 1.25)
+
+        if st.button("🔄 Reset Video Filters & Effects"):
+            st.session_state.reset_trigger += 1
+            st.rerun()
+
+        st.markdown("---")
+
+        # --- SECTION 3: AUDIO SETTING (Shifted Down) ---
+        st.markdown("### 🎵 Audio Setting")
+        enable_bg_music = st.checkbox("Add Background Music Track?", value=False)
+        bg_music_file = None
+        if enable_bg_music:
+            uploaded_music = st.file_uploader("Upload Background MP3 Audio File", type=["mp3", "wav"])
+            if uploaded_music is not None:
+                with open(bg_music_path, "wb") as f:
+                    f.write(uploaded_music.getbuffer())
+                st.success("Background Music Loaded!")
+                bg_music_file = bg_music_path
+
+            ac1, ac2 = st.columns(2)
+            with ac1:
+                orig_vol_pct = st.slider("Original Voice Volume (%)", min_value=0, max_value=200, value=100, step=5)
+                orig_vol = orig_vol_pct / 100.0
+            with ac2:
+                bg_vol_pct = st.slider("Background Music Volume (%)", min_value=0, max_value=100, value=15, step=1)
+                bg_vol = bg_vol_pct / 100.0
+
+        st.markdown("---")
         enable_face_tracking = st.checkbox("Enable Smart AI Face Tracking", value=True)
 
         render_clicked = st.button("🚀 Render Shorts Batch Now", type="primary", use_container_width=True)
@@ -265,7 +269,6 @@ if os.path.exists(video_path):
             img = Image.open(preview_path)
             draw = ImageDraw.Draw(img)
             
-            # Styling based on preset selection
             if "Hormozi" in style_preset or "Neon" in style_preset or "Glow" in style_preset:
                 text_color, outline_color = "#FFFF00", "#000000"
             elif "Minimal" in style_preset or "Apple" in style_preset:
@@ -301,7 +304,6 @@ if os.path.exists(video_path):
                 (x_pos, y_pos), wrapped_text, font=font, fill=text_color, 
                 anchor="mm", align="center", stroke_width=3, stroke_fill=outline_color
             )
-            # Expanded preview size to span well alongside the sections
             st.image(img, use_container_width=True, caption=f"Live Preview | Preset: {style_preset}")
 
     if render_clicked:
