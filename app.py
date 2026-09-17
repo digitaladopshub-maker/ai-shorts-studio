@@ -6,9 +6,9 @@ import textwrap
 import cv2
 from PIL import Image, ImageDraw, ImageFont
 
-st.set_page_config(page_title="Pro Shorts Studio - Ultimate", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Fillah Clipping", layout="wide", initial_sidebar_state="expanded")
 
-st.title("🎬 Smart Pro AI Shorts Studio - Ultimate Edition")
+st.title("🎬 Fillah Clipping")
 st.caption("Commercial-Grade AI Vertical Video, Modern Presets, Pro Fonts & Safe Margin Protection")
 
 if 'frame_time' not in st.session_state:
@@ -103,10 +103,10 @@ if os.path.exists(video_path):
         enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
         
         if enable_subs:
-            col_controls, col_preview = st.columns([1.2, 0.8])
+            # Layout adjusted so preview column is constrained (approx 60% smaller width footprint)
+            col_controls, col_preview = st.columns([1.5, 0.7])
             
             with col_controls:
-                # Row 1: Preset & Font Side-by-Side
                 r1_col1, r1_col2 = st.columns(2)
                 with r1_col1:
                     style_preset = st.selectbox("Preset", [
@@ -149,7 +149,6 @@ if os.path.exists(video_path):
                         "49. Righteous Regular", "50. Bungee Inline"
                     ], index=0)
 
-                # Row 2: Position & Font Size Side-by-Side
                 r2_col1, r2_col2 = st.columns(2)
                 with r2_col1:
                     caption_align = st.selectbox("Position", [
@@ -163,20 +162,21 @@ if os.path.exists(video_path):
                     font_size_map = {"Small (18px)": 18, "Medium (24px - Rec)": 24, "Large (32px)": 32, "Extra Large (40px)": 40}
                     font_size = font_size_map[font_size_option]
 
-                # Words Per Line as Clean Dropdown
                 words_per_line_option = st.selectbox("Words Per Line", ["1 Word", "2 Words (Recommended)", "3 Words", "4 Words", "5 Words"], index=1)
                 wpl_map = {"1 Word": 1, "2 Words (Recommended)": 2, "3 Words": 3, "4 Words": 4, "5 Words": 5}
                 words_per_line = wpl_map[words_per_line_option]
 
-                # Refresh Preview Frame Button shifted here
                 prev_sec = clip_ranges[0][0] if (clip_mode == "Manual Timestamps (Precise)" and clip_ranges) else "0"
                 if st.button("🔄 Refresh Preview Frame", use_container_width=True):
                     st.session_state.frame_time = prev_sec
                     if os.path.exists(preview_path):
                         os.remove(preview_path)
 
-                # Face Tracking Checkbox shifted below the preview button
                 enable_face_tracking = st.checkbox("🤖 Enable Smart AI Face Tracking (Center Crop on Speaker)", value=True)
+
+                st.markdown("---")
+                # Render button shifted right below the Face Tracking checkbox
+                render_clicked = st.button("🚀 Render Shorts Batch Now", type="primary", use_container_width=True)
 
             with col_preview:
                 target_time = st.session_state.frame_time if st.session_state.frame_time else prev_sec
@@ -212,7 +212,7 @@ if os.path.exists(video_path):
                         text_color, outline_color, anim_effect = "#FFFFFF", "#000000", "Fade In"
 
                     w, h = img.size
-                    sample_words = ["MODERN", "AI", "SHORTS", "PRESET", "PREVIEW"]
+                    sample_words = ["FILLAH", "CLIPPING", "PREVIEW"]
                     raw_text = " ".join(sample_words[:words_per_line])
                     
                     if "Pop-In" in anim_effect:
@@ -250,7 +250,8 @@ if os.path.exists(video_path):
                         (x_pos, y_pos), wrapped_text, font=font, fill=text_color, 
                         anchor="mm", align="center", stroke_width=3, stroke_fill=outline_color
                     )
-                    st.image(img, caption=f"Live Preview ({font_choice.split('.')[1].strip()})", use_container_width=True)
+                    # Width parameter constrains the preview image container so it appears neatly scaled down (~60% smaller footprint)
+                    st.image(img, width=280, caption=f"Live Preview ({font_choice.split('.')[1].strip()})")
 
     with tab_audio:
         st.subheader("🎵 Background Music & Audio Mixing (Percentage System)")
@@ -272,8 +273,7 @@ if os.path.exists(video_path):
                 bg_vol_pct = st.slider("Background Music Volume (%)", min_value=0, max_value=100, value=15, step=1)
                 bg_vol = bg_vol_pct / 100.0
 
-    st.markdown("---")
-    if st.button("🚀 Render Shorts Batch Now", type="primary", use_container_width=True):
+    if render_clicked:
         tasks = []
         if clip_mode == "Manual Timestamps (Precise)":
             for idx, (s_st, s_du) in enumerate(clip_ranges):
@@ -288,7 +288,7 @@ if os.path.exists(video_path):
         model = whisper.load_model("base") if enable_subs else None
         generated_clips = []
 
-        with st.spinner("Processing High-Quality Shorts with 20+ Presets & Pro Fonts..."):
+        with st.spinner("Processing High-Quality Shorts with Fillah Clipping Engine..."):
             for clip_num, start_sec, duration_sec in tasks:
                 cropped_file = f"cropped_{clip_num}.mp4"
                 final_file = f"final_short_{clip_num}.mp4"
