@@ -168,7 +168,7 @@ if os.path.exists(video_path):
                         raw_text = "✨ " + raw_text
 
                     wrapped_lines = textwrap.wrap(raw_text, width=14)
-                    wrapped_text = "\\n".join(wrapped_lines)
+                    wrapped_text = "\n".join(wrapped_lines)
 
                     font_path = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
                     if not os.path.exists(font_path):
@@ -264,10 +264,10 @@ if os.path.exists(video_path):
                     ass_file = f"subs_{clip_num}.ass"
                     
                     with open(ass_file, "w", encoding="utf-8") as f:
-                        f.write("[Script Info]\\nScriptType: v4.00+\\nPlayResX: 1080\\nPlayResY: 1920\\n\\n")
-                        f.write("[V4+ Styles]\\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\\n")
-                        f.write(f"Style: Default,Arial,{font_size*2.2},&H0000FFFF,&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},108,108,{vert_margin},1\\n\\n")
-                        f.write("[Events]\\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\\n")
+                        f.write("[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\n\n")
+                        f.write("[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
+                        f.write(f"Style: Default,Arial,{font_size*2.2},&H0000FFFF,&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},108,108,{vert_margin},1\n\n")
+                        f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
                         
                         for segment in result['segments']:
                             if 'words' in segment:
@@ -279,7 +279,7 @@ if os.path.exists(video_path):
                                     raw_str = " ".join([w['word'].strip() for w in chunk]).upper()
                                     
                                     wrapped_chunk = textwrap.wrap(raw_str, width=15)
-                                    text_str = "\\\\N".join(wrapped_chunk)
+                                    text_str = "\\N".join(wrapped_chunk)
                                     
                                     s_m, s_s = divmod(start_t, 60)
                                     s_h, s_m = divmod(s_m, 60)
@@ -296,7 +296,7 @@ if os.path.exists(video_path):
                                     else:
                                         anim_tag = ""
                                         
-                                    f.write(f"Dialogue: 0,{s_str},{e_str},Default,,0,0,0,,{anim_tag}{text_str}\\n")
+                                    f.write(f"Dialogue: 0,{s_str},{e_str},Default,,0,0,0,,{anim_tag}{text_str}\n")
 
                     sub_cmd = (
                         f'ffmpeg -y -i "{cropped_file}" '
