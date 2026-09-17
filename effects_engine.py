@@ -20,6 +20,9 @@ def get_pro_font(font_choice, font_size):
         return ImageFont.load_default()
 
 def get_filter_ffmpeg_string(filter_category, filter_name):
+    if filter_name == "None":
+        return ""
+        
     if filter_category == "High Quality & Aesthetic Filters (For Face & Body)":
         if "iPhone HD" in filter_name:
             return "eq=saturation=1.2:contrast=1.1:brightness=0.03,unsharp=5:5:1.0:3:3:0.3"
@@ -59,11 +62,13 @@ def get_filter_ffmpeg_string(filter_category, filter_name):
     return ""
 
 def get_style_effect_ffmpeg_string(effect_name):
-    if "Cyberpunk" in effect_name:
+    if effect_name == "None":
+        return ""
+    elif "Cyberpunk" in effect_name:
         return "eq=saturation=1.5:contrast=1.3,colorbalance=rm=0.2:bm=0.3"
     elif "Glitch Portrait" in effect_name:
         return "eq=contrast=1.4:brightness=0.1,unsharp=7:7:2.0"
-    elif "Blur / Halo Blur" in effect_name or "Blur" in effect_name:
+    elif "Blur" in effect_name:
         return "gblur=sigma=3.0"
     elif "Camera Shake" in effect_name:
         return "crop=in_w-20:in_h-20:10+10*sin(t*20):10+10*cos(t*15)"
