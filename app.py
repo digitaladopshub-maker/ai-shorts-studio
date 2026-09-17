@@ -8,8 +8,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 st.set_page_config(page_title="Pro Shorts Studio", layout="wide", initial_sidebar_state="expanded")
 
-st.title("🎬 Smart Pro AI Shorts Studio - Phase 3 (Percentage Audio)")
-st.caption("Commercial-Grade AI Vertical Video, Subtitle, Face Tracking & Audio Generator")
+st.title("🎬 Smart Pro AI Shorts Studio - Professional Edition")
+st.caption("Commercial-Grade AI Vertical Video, Smart Face Tracking & One-Click Cinematic Presets")
 
 if 'frame_time' not in st.session_state:
     st.session_state.frame_time = "0"
@@ -97,7 +97,7 @@ with st.sidebar:
             st.info("AI poori video ko process karke 3 clips cut karega.")
 
 if os.path.exists(video_path):
-    tab_subs, tab_audio = st.tabs(["✍️ Subtitle Customizer & Live Studio", "🎵 Audio & Background Music"])
+    tab_subs, tab_audio = st.tabs(["✍️ Professional Subtitle Studio", "🎵 Audio & Background Music"])
     
     with tab_subs:
         enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
@@ -107,24 +107,31 @@ if os.path.exists(video_path):
             col_controls, col_preview = st.columns([1.2, 0.8])
             
             with col_controls:
-                st.subheader("🎨 Captions Styling Controls")
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    caption_style = st.selectbox("Text Color Style", [
-                        "Yellow Bold (Alex Hormozi)", "White + Black Outline", 
-                        "Neon Green + Shadow", "Red Alert Style"
-                    ], index=0)
-                with col_b:
-                    anim_effect = st.selectbox("Animation Transition", [
-                        "Pop-In Scale (Fast Zoom)", "Fade In / Fade Out", "Standard Pop-Up"
-                    ], index=0)
+                st.subheader("🎨 Cinematic Master Presets")
+                
+                # Professional Preset Combo Selector
+                style_preset = st.selectbox("Select Ready-to-Use Style Preset", [
+                    "🔥 Alex Hormozi (Yellow Bold + Pop-In)",
+                    "✨ Cyber Neon (Neon Green + Glow)",
+                    "🛡️ Clean Minimalist (White + Black Outline)",
+                    "🚨 Viral Alert (Red + White Background)"
+                ], index=0)
 
                 st.markdown("---")
-                st.subheader("📐 Typography & Position")
-                caption_align = st.selectbox("Position Alignment", ["Bottom (Recommended)", "Middle-Center", "Top"], index=0)
+                st.subheader("📐 Typography & Smart Alignment")
+                
+                caption_align = st.selectbox("Position Alignment", [
+                    "Bottom (Smart Margin)", 
+                    "Middle-Center", 
+                    "Top (Smart Margin)"
+                ], index=0)
+                
                 words_per_line = st.slider("Words Per Line Box", min_value=1, max_value=5, value=2)
-                font_size = st.slider("Font Size Customizer", min_value=12, max_value=40, value=22)
-                vert_margin = st.slider("Vertical Bottom Offset (Height)", min_value=30, max_value=300, value=180)
+                
+                # Font Size as Clean Dropdown Option
+                font_size_option = st.selectbox("Font Size Preset", ["Small (18px)", "Medium (24px - Recommended)", "Large (32px)", "Extra Large (40px)"], index=1)
+                font_size_map = {"Small (18px)": 18, "Medium (24px - Recommended)": 24, "Large (32px)": 32, "Extra Large (40px)": 40}
+                font_size = font_size_map[font_size_option]
 
             with col_preview:
                 st.subheader("🖼 Instant Live Preview")
@@ -151,20 +158,24 @@ if os.path.exists(video_path):
                 if os.path.exists(preview_path):
                     img = Image.open(preview_path)
                     draw = ImageDraw.Draw(img)
-                    colors = {
-                        "Yellow Bold (Alex Hormozi)": ("#FFFF00", "#000000"),
-                        "White + Black Outline": ("#FFFFFF", "#000000"),
-                        "Neon Green + Shadow": ("#00FF00", "#000000"),
-                        "Red Alert Style": ("#FF0000", "#FFFFFF")
-                    }
-                    text_color, outline_color = colors[caption_style]
+                    
+                    # Resolve Preset Mapping
+                    if "Hormozi" in style_preset:
+                        text_color, outline_color, anim_effect = "#FFFF00", "#000000", "Pop-In Scale (Fast Zoom)"
+                    elif "Cyber" in style_preset:
+                        text_color, outline_color, anim_effect = "#00FF00", "#000000", "Pop-In Scale (Fast Zoom)"
+                    elif "Minimalist" in style_preset:
+                        text_color, outline_color, anim_effect = "#FFFFFF", "#000000", "Fade In / Fade Out"
+                    else:
+                        text_color, outline_color, anim_effect = "#FF0000", "#FFFFFF", "Standard Pop-Up"
+
                     w, h = img.size
-                    sample_words = ["SAMPLE", "CAPTION", "TEXT", "PREVIEW", "STYLE"]
+                    sample_words = ["PROFESSIONAL", "AI", "SHORTS", "STUDIO", "PREVIEW"]
                     raw_text = " ".join(sample_words[:words_per_line])
                     
-                    if anim_effect == "Pop-In Scale (Fast Zoom)":
+                    if "Pop-In" in anim_effect:
                         raw_text = "💥 " + raw_text
-                    elif anim_effect == "Fade In / Fade Out":
+                    elif "Fade" in anim_effect:
                         raw_text = "✨ " + raw_text
 
                     wrapped_lines = textwrap.wrap(raw_text, width=14)
@@ -179,19 +190,20 @@ if os.path.exists(video_path):
                     except:
                         font = ImageFont.load_default()
 
-                    if caption_align == "Top":
-                        y_pos = int(h * 0.12)
+                    # Smart Alignment calculations (No manual height slider needed)
+                    if caption_align == "Top (Smart Margin)":
+                        y_pos = int(h * 0.15)
                     elif caption_align == "Middle-Center":
                         y_pos = int(h * 0.5)
                     else:
-                        y_pos = int(h - (vert_margin * 1.8))
+                        y_pos = int(h - 220) # Perfect smart bottom offset
 
                     x_pos = int(w / 2)
                     draw.multiline_text(
                         (x_pos, y_pos), wrapped_text, font=font, fill=text_color, 
                         anchor="mm", align="center", stroke_width=3, stroke_fill=outline_color
                     )
-                    st.image(img, caption=f"Live Subtitle Preview (Frame at {target_time}s)", use_container_width=True)
+                    st.image(img, caption=f"Live Preset Preview (Frame at {target_time}s)", use_container_width=True)
 
     with tab_audio:
         st.subheader("🎵 Background Music & Audio Mixing (Percentage System)")
@@ -207,7 +219,6 @@ if os.path.exists(video_path):
 
             col_vol1, col_vol2 = st.columns(2)
             with col_vol1:
-                # Percentage Sliders: 0% to 200% for voice, 0% to 100% for background music
                 orig_vol_pct = st.slider("Original Voice Volume (%)", min_value=0, max_value=200, value=100, step=5)
                 orig_vol = orig_vol_pct / 100.0
             with col_vol2:
@@ -230,7 +241,7 @@ if os.path.exists(video_path):
         model = whisper.load_model("base") if enable_subs else None
         generated_clips = []
 
-        with st.spinner("Processing High-Quality Shorts with AI Engine & Audio Percentages..."):
+        with st.spinner("Processing High-Quality Shorts with AI Engine & Master Presets..."):
             for clip_num, start_sec, duration_sec in tasks:
                 cropped_file = f"cropped_{clip_num}.mp4"
                 final_file = f"final_short_{clip_num}.mp4"
@@ -260,8 +271,18 @@ if os.path.exists(video_path):
                         cropped_file = mixed_audio_file
 
                 if enable_subs and model:
-                    align_map = {"Top": "6", "Middle-Center": "5", "Bottom (Recommended)": "2"}
+                    align_map = {"Top (Smart Margin)": "6", "Middle-Center": "5", "Bottom (Smart Margin)": "2"}
                     align_val = align_map[caption_align]
+                    
+                    # Resolved preset styles for backend render
+                    if "Hormozi" in style_preset:
+                        ass_color, anim_tag_type = "&H0000FFFF", "pop"
+                    elif "Cyber" in style_preset:
+                        ass_color, anim_tag_type = "&H00FF0000", "pop"
+                    elif "Minimalist" in style_preset:
+                        ass_color, anim_tag_type = "&H00FFFFFF", "fade"
+                    else:
+                        ass_color, anim_tag_type = "&H000000FF", "none"
 
                     result = model.transcribe(cropped_file, word_timestamps=True)
                     ass_file = f"subs_{clip_num}.ass"
@@ -269,7 +290,11 @@ if os.path.exists(video_path):
                     with open(ass_file, "w", encoding="utf-8") as f:
                         f.write("[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\n\n")
                         f.write("[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
-                        f.write(f"Style: Default,Arial,{font_size*2.2},&H0000FFFF,&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},108,108,{vert_margin},1\n\n")
+                        
+                        # Smart bottom margin mapping
+                        margin_v_val = 180 if "Bottom" in caption_align else (100 if "Top" in caption_align else 960)
+                        
+                        f.write(f"Style: Default,Arial,{font_size*2.2},{ass_color},&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},108,108,{margin_v_val},1\n\n")
                         f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
                         
                         for segment in result['segments']:
@@ -292,9 +317,9 @@ if os.path.exists(video_path):
                                     s_str = f"{int(s_h)}:{int(s_m):02d}:{int(s_s):02d}.{int((start_t%1)*100):02d}"
                                     e_str = f"{int(e_h)}:{int(e_m):02d}:{int(e_s):02d}.{int((end_t%1)*100):02d}"
                                     
-                                    if anim_effect == "Pop-In Scale (Fast Zoom)":
+                                    if anim_tag_type == "pop":
                                         anim_tag = r"{\t(0,80,\fscx115\fscy115)\t(80,160,\fscx100\fscy100)}"
-                                    elif anim_effect == "Fade In / Fade Out":
+                                    elif anim_tag_type == "fade":
                                         anim_tag = r"{\fad(100,100)}"
                                     else:
                                         anim_tag = ""
