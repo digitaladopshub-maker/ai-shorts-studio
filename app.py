@@ -136,19 +136,19 @@ if os.path.exists(video_path):
         s_col1, s_col2 = st.columns(2)
         with s_col1:
             font_choice = st.selectbox("Font", [
-                "1. Montserrat Black", "2. Impact Pro", "3. Arial Black", "4. Comic Neue Bold",
-                "5. Trebuchet MS Bold", "6. Ubuntu Bold", "7. Liberation Sans Bold", "8. DejaVu Sans Bold",
-                "9. Inter Heavy", "10. Roboto Black", "11. Poppins ExtraBold (Viral)", "12. Oswald Bold",
-                "13. Anton Regular", "14. Bebas Neue Pro", "15. Nunito ExtraBold", "16. Raleway Black",
-                "17. Quicksand Bold", "18. Playfair Display Bold", "19. Merriweather Bold", "20. Fira Code Bold",
-                "21. JetBrains Mono Bold", "22. Space Grotesk Bold", "23. Syne ExtraBold", "24. DM Sans Bold",
-                "25. Work Sans Black", "26. PT Sans Bold", "27. Open Sans ExtraBold", "28. Lora Bold",
-                "29. Crimson Text Bold", "30. Cinzel Bold", "31. Archivo Black", "32. Cabin Bold",
-                "33. Mulish ExtraBold", "34. Barlow Condensed Bold", "35. Kanit Bold", "36. Prompt Bold",
-                "37. Sriracha Bold", "38. Caveat Bold", "39. Pacifico Pro", "40. Lobster Two",
-                "41. Bangers Regular", "42. Fredoka One", "43. Titan One", "44. Luckiest Guy",
-                "45. Chewy Regular", "46. Permanent Marker", "47. Amatic SC Bold", "48. Shadows Into Light",
-                "49. Righteous Regular", "50. Bungee Inline"
+                "Montserrat Black", "Impact Pro", "Arial Black", "Comic Neue Bold",
+                "Trebuchet MS Bold", "Ubuntu Bold", "Liberation Sans Bold", "DejaVu Sans Bold",
+                "Inter Heavy", "Roboto Black", "Poppins ExtraBold", "Oswald Bold",
+                "Anton Regular", "Bebas Neue Pro", "Nunito ExtraBold", "Raleway Black",
+                "Quicksand Bold", "Playfair Display Bold", "Merriweather Bold", "Fira Code Bold",
+                "JetBrains Mono Bold", "Space Grotesk Bold", "Syne ExtraBold", "DM Sans Bold",
+                "Work Sans Black", "PT Sans Bold", "Open Sans ExtraBold", "Lora Bold",
+                "Crimson Text Bold", "Cinzel Bold", "Archivo Black", "Cabin Bold",
+                "Mulish ExtraBold", "Barlow Condensed Bold", "Kanit Bold", "Prompt Bold",
+                "Sriracha Bold", "Caveat Bold", "Pacifico Pro", "Lobster Two",
+                "Bangers Regular", "Fredoka One", "Titan One", "Luckiest Guy",
+                "Chewy Regular", "Permanent Marker", "Amatic SC Bold", "Shadows Into Light",
+                "Righteous Regular", "Bungee Inline"
             ], index=0)
         with s_col2:
             caption_align = st.selectbox("Position", [
@@ -160,7 +160,7 @@ if os.path.exists(video_path):
         s_col3, s_col4 = st.columns(2)
         with s_col3:
             font_size_option = st.selectbox("Font Size", ["Small (18px)", "Medium (24px - Rec)", "Large (32px)", "Extra Large (40px)"], index=1)
-            font_size_map = {"Small (18px)": 20, "Medium (24px - Rec)": 30, "Large (32px)": 40, "Extra Large (40px)": 50}
+            font_size_map = {"Small (18px)": 18, "Medium (24px - Rec)": 24, "Large (32px)": 32, "Extra Large (40px)": 40}
             font_size = font_size_map[font_size_option]
         with s_col4:
             words_per_line_option = st.selectbox("Words Per Line", ["1 Word", "2 Words (Recommended)", "3 Words", "4 Words", "5 Words"], index=1)
@@ -279,8 +279,8 @@ if os.path.exists(video_path):
             if "Hormozi" in style_preset or "Pop" in style_preset:
                 raw_text = "💥 " + raw_text
 
-            # Strict character wrap width so text stays safely inside margins and never overflows
-            wrap_width = max(8, int(24 - (font_size / 3)))
+            # Strict safe-margin box wrapping limit
+            wrap_width = max(10, int(22 - (font_size / 3)))
             wrapped_lines = textwrap.wrap(raw_text, width=wrap_width)
             wrapped_text = "\n".join(wrapped_lines)
 
@@ -298,7 +298,7 @@ if os.path.exists(video_path):
                 (x_pos, y_pos), wrapped_text, font=font, fill=text_color, 
                 anchor="mm", align="center", stroke_width=3, stroke_fill=outline_color
             )
-            st.image(img, use_container_width=True, caption=f"Live Preview | Safe Margin Box Active")
+            st.image(img, use_container_width=True, caption=f"Live Preview | Safe Margin Active")
 
     if render_clicked:
         tasks = []
@@ -384,7 +384,7 @@ if os.path.exists(video_path):
                         margin_v_val = 240 if "Bottom" in caption_align else (160 if "Top" in caption_align else 960)
                         render_ass_fontsize = int(font_size * 2.2)
                         
-                        # Added strict left/right margins (MarginL and MarginR set to 120px) to keep text inside box boundaries
+                        # Strict safe margins (120px left and right) inside output video rendering
                         f.write(f"Style: Default,{ass_font_name},{render_ass_fontsize},{ass_color},&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},120,120,{margin_v_val},1\n\n")
                         f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
                         
@@ -397,7 +397,7 @@ if os.path.exists(video_path):
                                     end_t = chunk[-1]['end']
                                     raw_str = " ".join([w['word'].strip() for w in chunk]).upper()
                                     
-                                    render_wrap_width = max(10, int(22 - (font_size / 4)))
+                                    render_wrap_width = max(12, int(20 - (font_size / 4)))
                                     wrapped_chunk = textwrap.wrap(raw_str, width=render_wrap_width)
                                     text_str = "\\N".join(wrapped_chunk)
                                     
