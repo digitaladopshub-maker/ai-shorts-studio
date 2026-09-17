@@ -101,7 +101,6 @@ if os.path.exists(video_path):
     
     with tab_subs:
         enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
-        enable_face_tracking = st.checkbox("🤖 Enable Smart AI Face Tracking (Center Crop on Speaker)", value=True)
         
         if enable_subs:
             col_controls, col_preview = st.columns([1.2, 0.8])
@@ -164,17 +163,22 @@ if os.path.exists(video_path):
                     font_size_map = {"Small (18px)": 18, "Medium (24px - Rec)": 24, "Large (32px)": 32, "Extra Large (40px)": 40}
                     font_size = font_size_map[font_size_option]
 
-                words_per_line = st.slider("Words Per Line Box", min_value=1, max_value=5, value=2)
+                # Words Per Line as Clean Dropdown
+                words_per_line_option = st.selectbox("Words Per Line", ["1 Word", "2 Words (Recommended)", "3 Words", "4 Words", "5 Words"], index=1)
+                wpl_map = {"1 Word": 1, "2 Words (Recommended)": 2, "3 Words": 3, "4 Words": 4, "5 Words": 5}
+                words_per_line = wpl_map[words_per_line_option]
 
-            with col_preview:
-                st.subheader("🖼 Instant Live Preview")
+                # Refresh Preview Frame Button shifted here
                 prev_sec = clip_ranges[0][0] if (clip_mode == "Manual Timestamps (Precise)" and clip_ranges) else "0"
-                
                 if st.button("🔄 Refresh Preview Frame", use_container_width=True):
                     st.session_state.frame_time = prev_sec
                     if os.path.exists(preview_path):
                         os.remove(preview_path)
 
+                # Face Tracking Checkbox shifted below the preview button
+                enable_face_tracking = st.checkbox("🤖 Enable Smart AI Face Tracking (Center Crop on Speaker)", value=True)
+
+            with col_preview:
                 target_time = st.session_state.frame_time if st.session_state.frame_time else prev_sec
                 
                 vf_crop = "crop=ih*9/16:ih,scale=540:960"
@@ -192,7 +196,6 @@ if os.path.exists(video_path):
                     img = Image.open(preview_path)
                     draw = ImageDraw.Draw(img)
                     
-                    # Resolve Colors & Animation
                     if "Hormozi" in style_preset or "Lemon" in style_preset:
                         text_color, outline_color, anim_effect = "#FFFF00", "#000000", "Pop-In Scale"
                     elif "Cyberpunk" in style_preset or "Matrix" in style_preset:
@@ -220,20 +223,10 @@ if os.path.exists(video_path):
                     wrapped_lines = textwrap.wrap(raw_text, width=14)
                     wrapped_text = "\n".join(wrapped_lines)
 
-                    # Dynamic Font Mapping for Live Preview
-                    font_candidates = []
-                    if "Impact" in font_choice:
-                        font_candidates = ["/usr/share/fonts/truetype/msttcorefonts/Impact.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]
-                    elif "Arial" in font_choice:
-                        font_candidates = ["/usr/share/fonts/truetype/msttcorefonts/Arial_Black.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"]
-                    elif "Oswald" in font_choice or "Bebas" in font_choice:
-                        font_candidates = ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]
-                    else:
-                        font_candidates = [
-                            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-                            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-                        ]
-
+                    font_candidates = [
+                        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+                        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+                    ]
                     font = None
                     for fc in font_candidates:
                         if os.path.exists(fc):
@@ -245,13 +238,12 @@ if os.path.exists(video_path):
                     if font is None:
                         font = ImageFont.load_default()
 
-                    # Safe Margin Positioning
                     if "Top" in caption_align:
                         y_pos = int(h * 0.18)
                     elif "Middle-Center" in caption_align:
                         y_pos = int(h * 0.5)
                     else:
-                        y_pos = int(h - 260) # Safe zone above TikTok/YT action buttons
+                        y_pos = int(h - 260)
 
                     x_pos = int(w / 2)
                     draw.multiline_text(
