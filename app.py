@@ -6,10 +6,10 @@ import textwrap
 import cv2
 from PIL import Image, ImageDraw, ImageFont
 
-st.set_page_config(page_title="Fillah Clipping", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Clipping", layout="wide", initial_sidebar_state="expanded")
 
-st.title("🎬 Fillah Clipping")
-st.caption("Commercial-Grade AI Vertical Video, Modern Presets, Pro Fonts & Safe Margin Protection")
+st.title("🎬 Clipping")
+st.caption("Free for every one")
 
 if 'frame_time' not in st.session_state:
     st.session_state.frame_time = "0"
@@ -39,6 +39,25 @@ def detect_face_center(v_path, start_sec):
             return x + (w // 2)
     except Exception:
         return None
+    return None
+
+def get_font_path(font_choice):
+    # Maps selected font option to actual system font path with fallbacks
+    font_files = [
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/msttcorefonts/Impact.ttf",
+        "/usr/share/fonts/truetype/msttcorefonts/Arial_Black.ttf"
+    ]
+    # Specific matching for standard Linux installed fonts or fallbacks
+    if "Impact" in font_choice and os.path.exists("/usr/share/fonts/truetype/msttcorefonts/Impact.ttf"):
+        return "/usr/share/fonts/truetype/msttcorefonts/Impact.ttf"
+    elif "Arial" in font_choice and os.path.exists("/usr/share/fonts/truetype/msttcorefonts/Arial_Black.ttf"):
+        return "/usr/share/fonts/truetype/msttcorefonts/Arial_Black.ttf"
+    
+    for f in font_files:
+        if os.path.exists(f):
+            return f
     return None
 
 with st.sidebar:
@@ -103,7 +122,6 @@ if os.path.exists(video_path):
         enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
         
         if enable_subs:
-            # Layout adjusted so preview column is constrained (approx 60% smaller width footprint)
             col_controls, col_preview = st.columns([1.5, 0.7])
             
             with col_controls:
@@ -175,7 +193,6 @@ if os.path.exists(video_path):
                 enable_face_tracking = st.checkbox("🤖 Enable Smart AI Face Tracking (Center Crop on Speaker)", value=True)
 
                 st.markdown("---")
-                # Render button shifted right below the Face Tracking checkbox
                 render_clicked = st.button("🚀 Render Shorts Batch Now", type="primary", use_container_width=True)
 
             with col_preview:
@@ -212,7 +229,7 @@ if os.path.exists(video_path):
                         text_color, outline_color, anim_effect = "#FFFFFF", "#000000", "Fade In"
 
                     w, h = img.size
-                    sample_words = ["FILLAH", "CLIPPING", "PREVIEW"]
+                    sample_words = ["CLIPPING", "PREVIEW", "TEXT"]
                     raw_text = " ".join(sample_words[:words_per_line])
                     
                     if "Pop-In" in anim_effect:
@@ -223,19 +240,11 @@ if os.path.exists(video_path):
                     wrapped_lines = textwrap.wrap(raw_text, width=14)
                     wrapped_text = "\n".join(wrapped_lines)
 
-                    font_candidates = [
-                        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-                        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-                    ]
-                    font = None
-                    for fc in font_candidates:
-                        if os.path.exists(fc):
-                            try:
-                                font = ImageFont.truetype(fc, int(font_size * 1.6))
-                                break
-                            except:
-                                continue
-                    if font is None:
+                    # Dynamic Selected Font Application
+                    selected_fpath = get_font_path(font_choice)
+                    try:
+                        font = ImageFont.truetype(selected_fpath, int(font_size * 1.6))
+                    except:
                         font = ImageFont.load_default()
 
                     if "Top" in caption_align:
@@ -250,7 +259,6 @@ if os.path.exists(video_path):
                         (x_pos, y_pos), wrapped_text, font=font, fill=text_color, 
                         anchor="mm", align="center", stroke_width=3, stroke_fill=outline_color
                     )
-                    # Width parameter constrains the preview image container so it appears neatly scaled down (~60% smaller footprint)
                     st.image(img, width=280, caption=f"Live Preview ({font_choice.split('.')[1].strip()})")
 
     with tab_audio:
@@ -288,7 +296,7 @@ if os.path.exists(video_path):
         model = whisper.load_model("base") if enable_subs else None
         generated_clips = []
 
-        with st.spinner("Processing High-Quality Shorts with Fillah Clipping Engine..."):
+        with st.spinner("Processing High-Quality Shorts with Clipping Engine..."):
             for clip_num, start_sec, duration_sec in tasks:
                 cropped_file = f"cropped_{clip_num}.mp4"
                 final_file = f"final_short_{clip_num}.mp4"
@@ -334,6 +342,9 @@ if os.path.exists(video_path):
                     else:
                         ass_color, anim_tag_type = "&H00FFFFFF", "fade"
 
+                    # Map Font Choice name to ASS format font name
+                    ass_font_name = "Impact" if "Impact" in font_choice else ("Arial" if "Arial" in font_choice else "DejaVu Sans")
+
                     result = model.transcribe(cropped_file, word_timestamps=True)
                     ass_file = f"subs_{clip_num}.ass"
                     
@@ -343,7 +354,7 @@ if os.path.exists(video_path):
                         
                         margin_v_val = 240 if "Bottom" in caption_align else (160 if "Top" in caption_align else 960)
                         
-                        f.write(f"Style: Default,Arial,{font_size*2.2},{ass_color},&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},108,108,{margin_v_val},1\n\n")
+                        f.write(f"Style: Default,{ass_font_name},{font_size*2.2},{ass_color},&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},108,108,{margin_v_val},1\n\n")
                         f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
                         
                         for segment in result['segments']:
