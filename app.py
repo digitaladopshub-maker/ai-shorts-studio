@@ -5,7 +5,8 @@ import os
 import textwrap
 import cv2
 from PIL import Image, ImageDraw
-from effects_engine import get_pro_font, get_filter_ffmpeg_string, get_style_effect_ffmpeg_string
+from fonts import get_pro_font
+from effects_engine import get_filter_ffmpeg_string, get_style_effect_ffmpeg_string
 from subtitle_engine import get_subtitle_styling
 
 st.set_page_config(page_title="Clipping", layout="wide", initial_sidebar_state="expanded")
@@ -110,26 +111,26 @@ if os.path.exists(video_path):
         enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
         
         style_preset = st.selectbox("Subtitle Preset", [
-            "⚡ The Alex Hormozi Style",
-            "⚡ Border Pop-Up",
-            "⚡ Karaoke Highlight",
-            "⚡ The Power Word Scale",
-            "⚡ Glow & Shine Effect",
-            "🎨 The Minimal Subtitle Block",
-            "🎨 Apple Style Minimal",
-            "🎨 The Gradient Premium Stack",
-            "🎨 Real Estate Pro",
-            "🎨 The 3D Viral Text",
-            "🎬 Multiple Word Slide Up",
-            "🎬 Typewriter Effect",
-            "🎬 Flicker Text",
-            "🎬 Wave In / Bounce",
-            "🎬 Blur Fade In",
-            "🎭 Auto-Emoji Pop",
-            "🎭 TikTok Classic Style",
-            "🎭 Sound Effects Bracket",
-            "🎭 CapCut Auto Lyric Template",
-            "🎭 The Cyberpunk Neon"
+            "The Alex Hormozi Style",
+            "Border Pop-Up",
+            "Karaoke Highlight",
+            "The Power Word Scale",
+            "Glow & Shine Effect",
+            "The Minimal Subtitle Block",
+            "Apple Style Minimal",
+            "The Gradient Premium Stack",
+            "Real Estate Pro",
+            "The 3D Viral Text",
+            "Multiple Word Slide Up",
+            "Typewriter Effect",
+            "Flicker Text",
+            "Wave In / Bounce",
+            "Blur Fade In",
+            "Auto-Emoji Pop",
+            "TikTok Classic Style",
+            "Sound Effects Bracket",
+            "CapCut Auto Lyric Template",
+            "The Cyberpunk Neon"
         ], index=0)
 
         s_col1, s_col2 = st.columns(2)
@@ -137,7 +138,7 @@ if os.path.exists(video_path):
             font_choice = st.selectbox("Font", [
                 "1. Montserrat Black", "2. Impact Pro", "3. Arial Black", "4. Comic Neue Bold",
                 "5. Trebuchet MS Bold", "6. Ubuntu Bold", "7. Liberation Sans Bold", "8. DejaVu Sans Bold",
-                "9. Inter Heavy", "10. Roboto Black", "11. Poppins ExtraBold (Viral - Rec)", "12. Oswald Bold",
+                "9. Inter Heavy", "10. Roboto Black", "11. Poppins ExtraBold (Viral)", "12. Oswald Bold",
                 "13. Anton Regular", "14. Bebas Neue Pro", "15. Nunito ExtraBold", "16. Raleway Black",
                 "17. Quicksand Bold", "18. Playfair Display Bold", "19. Merriweather Bold", "20. Fira Code Bold",
                 "21. JetBrains Mono Bold", "22. Space Grotesk Bold", "23. Syne ExtraBold", "24. DM Sans Bold",
@@ -148,7 +149,7 @@ if os.path.exists(video_path):
                 "41. Bangers Regular", "42. Fredoka One", "43. Titan One", "44. Luckiest Guy",
                 "45. Chewy Regular", "46. Permanent Marker", "47. Amatic SC Bold", "48. Shadows Into Light",
                 "49. Righteous Regular", "50. Bungee Inline"
-            ], index=10)
+            ], index=1)
         with s_col2:
             caption_align = st.selectbox("Position", [
                 "Bottom (Safe Zone)", 
@@ -159,7 +160,9 @@ if os.path.exists(video_path):
         s_col3, s_col4 = st.columns(2)
         with s_col3:
             font_size_option = st.selectbox("Font Size", ["Small (18px)", "Medium (24px - Rec)", "Large (32px)", "Extra Large (40px)"], index=1)
-            font_size_map = {"Small (18px)": 18, "Medium (24px - Rec)": 24, "Large (32px)": 32, "Extra Large (40px)": 40}
+            font_size_map = {"Small (18px)": 18, "Medium (24px - Rec)": 28, "Large (36px)": 36, "Extra Large (40px)": 44}
+            # Fix mapping for clean scaling
+            font_size_map = {"Small (18px)": 16, "Medium (24px - Rec)": 24, "Large (32px)": 32, "Extra Large (40px)": 40}
             font_size = font_size_map[font_size_option]
         with s_col4:
             words_per_line_option = st.selectbox("Words Per Line", ["1 Word", "2 Words (Recommended)", "3 Words", "4 Words", "5 Words"], index=1)
@@ -281,6 +284,7 @@ if os.path.exists(video_path):
             wrapped_lines = textwrap.wrap(raw_text, width=14)
             wrapped_text = "\n".join(wrapped_lines)
 
+            # Properly scaled font for preview rendering
             font = get_pro_font(font_choice, font_size)
 
             if "Top" in caption_align:
@@ -295,7 +299,7 @@ if os.path.exists(video_path):
                 (x_pos, y_pos), wrapped_text, font=font, fill=text_color, 
                 anchor="mm", align="center", stroke_width=3, stroke_fill=outline_color
             )
-            st.image(img, use_container_width=True, caption=f"Live Preview | Preset Active")
+            st.image(img, use_container_width=True, caption=f"Live Preview | Font: {font_choice.split('.')[1].strip()}")
 
     if render_clicked:
         tasks = []
