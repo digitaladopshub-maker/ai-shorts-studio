@@ -42,23 +42,46 @@ def detect_face_center(v_path, start_sec):
     return None
 
 def get_font_path(font_choice):
-    # Maps selected font option to actual system font path with fallbacks
-    font_files = [
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/truetype/msttcorefonts/Impact.ttf",
-        "/usr/share/fonts/truetype/msttcorefonts/Arial_Black.ttf"
-    ]
-    # Specific matching for standard Linux installed fonts or fallbacks
-    if "Impact" in font_choice and os.path.exists("/usr/share/fonts/truetype/msttcorefonts/Impact.ttf"):
-        return "/usr/share/fonts/truetype/msttcorefonts/Impact.ttf"
-    elif "Arial" in font_choice and os.path.exists("/usr/share/fonts/truetype/msttcorefonts/Arial_Black.ttf"):
-        return "/usr/share/fonts/truetype/msttcorefonts/Arial_Black.ttf"
+    # Distinct system font mapping so changing dropdown visibly changes the font style
+    font_pools = {
+        "serif": [
+            "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
+            "/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf"
+        ],
+        "mono": [
+            "/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
+        ],
+        "clean": [
+            "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        ],
+        "heavy": [
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
+        ]
+    }
     
-    for f in font_files:
+    # Categorize based on font name to provide visual variety
+    if any(x in font_choice for x in ["Playfair", "Lora", "Merriweather", "Crimson", "Cinzel", "Serif", "Times"]):
+        pool = font_pools["serif"]
+    elif any(x in font_choice for x in ["Mono", "Code", "JetBrains", "Fira", "Ubuntu"]):
+        pool = font_pools["mono"]
+    elif any(x in font_choice for x in ["Comic", "Caveat", "Pacifico", "Lobster", "Sriracha", "Hand", "Shadows"]):
+        pool = font_pools["clean"]
+    else:
+        pool = font_pools["heavy"]
+        
+    for f in pool:
         if os.path.exists(f):
             return f
-    return None
+            
+    # Absolute fallback
+    for cat in font_pools.values():
+        for f in cat:
+            if os.path.exists(f):
+                return f
+    return "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
 with st.sidebar:
     st.header("📥 1. Media Input")
@@ -240,7 +263,7 @@ if os.path.exists(video_path):
                     wrapped_lines = textwrap.wrap(raw_text, width=14)
                     wrapped_text = "\n".join(wrapped_lines)
 
-                    # Dynamic Selected Font Application
+                    # Apply Selected Font Dynamically
                     selected_fpath = get_font_path(font_choice)
                     try:
                         font = ImageFont.truetype(selected_fpath, int(font_size * 1.6))
@@ -342,8 +365,7 @@ if os.path.exists(video_path):
                     else:
                         ass_color, anim_tag_type = "&H00FFFFFF", "fade"
 
-                    # Map Font Choice name to ASS format font name
-                    ass_font_name = "Impact" if "Impact" in font_choice else ("Arial" if "Arial" in font_choice else "DejaVu Sans")
+                    ass_font_name = "Liberation Serif" if any(x in font_choice for x in ["Playfair", "Lora", "Merriweather", "Serif"]) else "Liberation Sans"
 
                     result = model.transcribe(cropped_file, word_timestamps=True)
                     ass_file = f"subs_{clip_num}.ass"
