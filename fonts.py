@@ -2,44 +2,46 @@ import os
 from PIL import ImageFont
 
 def get_pro_font(font_choice, font_size):
-    # Robust font file paths mapping for Linux/Streamlit Cloud
-    paths = [
+    # Comprehensive TrueType font pool available on Linux/Streamlit Cloud servers
+    font_paths = [
+        "/usr/share/fonts/truetype/msttcorefonts/Impact.ttf",
+        "/usr/share/fonts/truetype/msttcorefonts/Arial_Black.ttf",
         "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf"
+        "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf"
     ]
     
-    # Select path based on choice category
-    selected_path = paths[0]
-    if any(x in font_choice for x in ["Impact", "Arial Black", "Anton", "Bebas", "Black", "Heavy", "Pro"]):
-        for p in [
-            "/usr/share/fonts/truetype/msttcorefonts/Impact.ttf",
-            "/usr/share/fonts/truetype/msttcorefonts/Arial_Black.ttf",
-            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
-        ]:
-            if os.path.exists(p):
+    # Select font file based on user's choice string
+    selected_path = font_paths[2] # Default Liberation Sans Bold
+    choice_lower = font_choice.lower()
+    
+    if "impact" in choice_lower and os.path.exists(font_paths[0]):
+        selected_path = font_paths[0]
+    elif any(x in choice_lower for x in ["arial", "black", "heavy", "pro", "anton", "bebas", "montserrat"]) and os.path.exists(font_paths[1]):
+        selected_path = font_paths[1]
+    elif any(x in choice_lower for x in ["serif", "playfair", "lora", "merriweather", "crimson", "cinzel"]):
+        for p in font_paths:
+            if "Serif" in p and os.path.exists(p):
                 selected_path = p
                 break
-    elif any(x in font_choice for x in ["Serif", "Playfair", "Lora", "Merriweather", "Crimson", "Cinzel"]):
-        for p in [
-            "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf"
-        ]:
-            if os.path.exists(p):
+    elif any(x in choice_lower for x in ["mono", "code", "jetbrains", "fira", "space", "ubuntu"]):
+        for p in font_paths:
+            if "Mono" in p and os.path.exists(p):
                 selected_path = p
                 break
-    elif any(x in font_choice for x in ["Mono", "Code", "JetBrains", "Fira", "Space", "Ubuntu"]):
-        for p in [
-            "/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
-        ]:
+    else:
+        for p in font_paths:
             if os.path.exists(p):
                 selected_path = p
                 break
 
-    # Dynamic scaling factor fixed so font size is never too small
-    calculated_size = max(int(font_size * 2.2), 16)
+    # Force proper multiplier so font size is large, clear, and fully controllable
+    final_px = int(font_size * 2.8)
     try:
-        return ImageFont.truetype(selected_path, calculated_size)
+        return ImageFont.truetype(selected_path, final_px)
     except Exception:
-        return ImageFont.load_default()
+        try:
+            return ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", final_px)
+        except Exception:
+            return ImageFont.load_default()
