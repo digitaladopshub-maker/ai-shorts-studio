@@ -8,8 +8,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 st.set_page_config(page_title="Pro Shorts Studio", layout="wide", initial_sidebar_state="expanded")
 
-st.title("🎬 Smart Pro AI Shorts Studio - Phase 3 (Cloud Live)")
-st.caption("Commercial-Grade AI Vertical Video, Subtitle & Audio Generator")
+st.title("🎬 Smart Pro AI Shorts Studio - Phase 3 (Cloud Live + Face Tracking)")
+st.caption("Commercial-Grade AI Vertical Video, Subtitle, Face Tracking & Audio Generator")
 
 if 'frame_time' not in st.session_state:
     st.session_state.frame_time = "0"
@@ -227,11 +227,12 @@ if os.path.exists(video_path):
         model = whisper.load_model("base") if enable_subs else None
         generated_clips = []
 
-        with st.spinner("Processing High-Quality Shorts with AI Engine..."):
+        with st.spinner("Processing High-Quality Shorts with AI Engine & Face Tracking..."):
             for clip_num, start_sec, duration_sec in tasks:
                 cropped_file = f"cropped_{clip_num}.mp4"
                 final_file = f"final_short_{clip_num}.mp4"
                 
+                # Face Tracking Integration for Final Render
                 vf_crop_hd = "crop=ih*9/16:ih,scale=1080:1920"
                 if enable_face_tracking:
                     f_x = detect_face_center(video_path, start_sec)
