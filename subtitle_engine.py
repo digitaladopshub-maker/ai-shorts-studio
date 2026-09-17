@@ -1,4 +1,5 @@
 def get_subtitle_styling(style_preset):
+    # Returns (text_color, outline_color, has_box, anim_type, ass_color_hex)
     preset_lower = style_preset.lower()
     
     if "hormozi" in preset_lower or "pop" in preset_lower or "neon" in preset_lower:
