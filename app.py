@@ -105,31 +105,31 @@ if os.path.exists(video_path):
     col_controls, col_preview = st.columns([1.4, 0.8])
     
     with col_controls:
-        # --- SECTION 1: SUBTITLE SETTING (Categorized as requested) ---
+        # --- SECTION 1: SUBTITLE SETTING ---
         st.markdown("### ✍️ Subtitle Setting")
         enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
         
         style_preset = st.selectbox("Subtitle Preset", [
-            "⚡ [Word-by-Word Pop & Highlight] The Alex Hormozi Style",
-            "⚡ [Word-by-Word Pop & Highlight] Border Pop-Up",
-            "⚡ [Word-by-Word Pop & Highlight] Karaoke Highlight",
-            "⚡ [Word-by-Word Pop & Highlight] The Power Word Scale",
-            "⚡ [Word-by-Word Pop & Highlight] Glow & Shine Effect",
-            "🎨 [Modern & Aesthetic Blocks] The Minimal Subtitle Block",
-            "🎨 [Modern & Aesthetic Blocks] Apple Style Minimal",
-            "🎨 [Modern & Aesthetic Blocks] The Gradient Premium Stack",
-            "🎨 [Modern & Aesthetic Blocks] Real Estate Pro",
-            "🎨 [Modern & Aesthetic Blocks] The 3D Viral Text",
-            "🎬 [Animated & Dynamic Transitions] Multiple Word Slide Up",
-            "🎬 [Animated & Dynamic Transitions] Typewriter Effect",
-            "🎬 [Animated & Dynamic Transitions] Flicker Text",
-            "🎬 [Animated & Dynamic Transitions] Wave In / Bounce",
-            "🎬 [Animated & Dynamic Transitions] Blur Fade In",
-            "🎭 [Social Media & Auto-Emoji] Auto-Emoji Pop",
-            "🎭 [Social Media & Auto-Emoji] TikTok Classic Style",
-            "🎭 [Social Media & Auto-Emoji] Sound Effects Bracket",
-            "🎭 [Social Media & Auto-Emoji] CapCut Auto Lyric Template",
-            "🎭 [Social Media & Auto-Emoji] The Cyberpunk Neon"
+            "⚡ The Alex Hormozi Style",
+            "⚡ Border Pop-Up",
+            "⚡ Karaoke Highlight",
+            "⚡ The Power Word Scale",
+            "⚡ Glow & Shine Effect",
+            "🎨 The Minimal Subtitle Block",
+            "🎨 Apple Style Minimal",
+            "🎨 The Gradient Premium Stack",
+            "🎨 Real Estate Pro",
+            "🎨 The 3D Viral Text",
+            "🎬 Multiple Word Slide Up",
+            "🎬 Typewriter Effect",
+            "🎬 Flicker Text",
+            "🎬 Wave In / Bounce",
+            "🎬 Blur Fade In",
+            "🎭 Auto-Emoji Pop",
+            "🎭 TikTok Classic Style",
+            "🎭 Sound Effects Bracket",
+            "🎭 CapCut Auto Lyric Template",
+            "🎭 The Cyberpunk Neon"
         ], index=0)
 
         s_col1, s_col2 = st.columns(2)
@@ -137,7 +137,7 @@ if os.path.exists(video_path):
             font_choice = st.selectbox("Font", [
                 "1. Montserrat Black", "2. Impact Pro", "3. Arial Black", "4. Comic Neue Bold",
                 "5. Trebuchet MS Bold", "6. Ubuntu Bold", "7. Liberation Sans Bold", "8. DejaVu Sans Bold",
-                "9. Inter Heavy", "10. Roboto Black", "11. Poppins ExtraBold (Viral)", "12. Oswald Bold",
+                "9. Inter Heavy", "10. Roboto Black", "11. Poppins ExtraBold (Viral - Rec)", "12. Oswald Bold",
                 "13. Anton Regular", "14. Bebas Neue Pro", "15. Nunito ExtraBold", "16. Raleway Black",
                 "17. Quicksand Bold", "18. Playfair Display Bold", "19. Merriweather Bold", "20. Fira Code Bold",
                 "21. JetBrains Mono Bold", "22. Space Grotesk Bold", "23. Syne ExtraBold", "24. DM Sans Bold",
@@ -275,7 +275,7 @@ if os.path.exists(video_path):
             sample_words = ["CLIPPING", "PREVIEW", "VIRAL"]
             raw_text = " ".join(sample_words[:words_per_line])
             
-            if "Alex Hormozi" in style_preset or "Pop" in style_preset:
+            if "Hormozi" in style_preset or "Pop" in style_preset:
                 raw_text = "💥 " + raw_text
 
             wrapped_lines = textwrap.wrap(raw_text, width=14)
@@ -295,7 +295,7 @@ if os.path.exists(video_path):
                 (x_pos, y_pos), wrapped_text, font=font, fill=text_color, 
                 anchor="mm", align="center", stroke_width=3, stroke_fill=outline_color
             )
-            st.image(img, use_container_width=True, caption=f"Live Preview | Selected Preset")
+            st.image(img, use_container_width=True, caption=f"Live Preview | Preset Active")
 
     if render_clicked:
         tasks = []
@@ -403,7 +403,7 @@ if os.path.exists(video_path):
                                     s_str = f"{int(s_h)}:{int(s_m):02d}:{int(s_s):02d}.{int((start_t%1)*100):02d}"
                                     e_str = f"{int(e_h)}:{int(e_m):02d}:{int(e_s):02d}.{int((end_t%1)*100):02d}"
                                     
-                                    anim_tag = r"{\t(0,80,\fscx115\fscy115)\t(80,160,\fscx100\fscy100)}" if "Alex Hormozi" in style_preset else ""
+                                    anim_tag = r"{\t(0,80,\fscx115\fscy115)\t(80,160,\fscx100\fscy100)}" if "Hormozi" in style_preset else ""
                                         
                                     f.write(f"Dialogue: 0,{s_str},{e_str},Default,,0,0,0,,{anim_tag}{text_str}\n")
 
