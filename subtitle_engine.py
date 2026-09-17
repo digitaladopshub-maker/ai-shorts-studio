@@ -1,19 +1,16 @@
 def get_subtitle_styling(style_preset):
-    # Returns (text_color, outline_color, has_box, anim_type, ass_color_hex)
+    # Categorized matching for user's detailed subtitle presets
     preset_lower = style_preset.lower()
     
-    if "hormozi" in preset_lower or "pop" in preset_lower or "neon" in preset_lower:
+    if any(x in preset_lower for x in ["hormozi", "border pop", "power word", "glow & shine", "karaoke"]):
         return ("#FFFF00", "#000000", False, "Pop-In Scale", "&H0000FFFF")
-    elif "minimal" in preset_lower or "apple" in preset_lower:
+    elif any(x in preset_lower for x in ["minimal", "apple style", "real estate", "gradient premium"]):
         return ("#FFFFFF", "#000000", False, "Fade In", "&H00FFFFFF")
-    elif "gradient" in preset_lower or "3d" in preset_lower:
+    elif any(x in preset_lower for x in ["3d viral", "cyberpunk", "glitch"]):
         return ("#00FFFF", "#000066", False, "Pop-In Scale", "&H00FFFF00")
-    elif "alert" in preset_lower or "firecracker" in preset_lower or "red" in preset_lower:
-        return ("#FF0000", "#FFFFFF", False, "Standard", "&H000000FF")
-    elif "cyberpunk" in preset_lower:
-        return ("#00FF00", "#000000", True, "Pop-In Scale", "&H00FF0000")
-    elif "karaoke" in preset_lower:
+    elif any(x in preset_lower for x in ["slide up", "typewriter", "flicker", "wave", "blur fade"]):
         return ("#FFD700", "#000000", False, "Pop-In Scale", "&H0000D7FF")
+    elif any(x in preset_lower for x in ["emoji", "tiktok", "sound effects", "lyric"]):
+        return ("#FF5733", "#000000", False, "Standard", "&H003357FF")
     else:
-        # Default professional fallback matching original high-engagement style
         return ("#FFFF00", "#000000", False, "Pop-In Scale", "&H0000FFFF")
