@@ -5,7 +5,7 @@ import os
 import textwrap
 import cv2
 from PIL import Image, ImageDraw
-from fonts import get_pro_font
+from effects_engine import get_pro_font, get_filter_ffmpeg_string, get_style_effect_ffmpeg_string
 
 st.set_page_config(page_title="Clipping", layout="wide", initial_sidebar_state="expanded")
 
@@ -107,36 +107,40 @@ if os.path.exists(video_path):
             col_controls, col_preview = st.columns([1.5, 0.7])
             
             with col_controls:
+                # Subtitle Preset categorized selection
+                style_preset = st.selectbox("Subtitle Preset", [
+                    "--- Word-by-Word Pop & Highlight Styles ---",
+                    "The Alex Hormozi Style",
+                    "Border Pop-Up",
+                    "Karaoke Highlight",
+                    "The Power Word Scale",
+                    "Glow & Shine Effect",
+                    "--- Modern & Aesthetic Subtitle Blocks ---",
+                    "The Minimal Subtitle Block",
+                    "Apple Style Minimal",
+                    "The Gradient Premium Stack",
+                    "Real Estate Pro",
+                    "The 3D Viral Text",
+                    "--- Animated & Dynamic Transitions ---",
+                    "Multiple Word Slide Up",
+                    "Typewriter Effect",
+                    "Flicker Text",
+                    "Wave In / Bounce",
+                    "Blur Fade In",
+                    "--- Social Media & Auto-Emoji Captions ---",
+                    "Auto-Emoji Pop",
+                    "TikTok Classic Style",
+                    "Sound Effects Bracket",
+                    "CapCut Auto Lyric Template",
+                    "The Cyberpunk Neon"
+                ], index=1)
+
                 r1_col1, r1_col2 = st.columns(2)
                 with r1_col1:
-                    style_preset = st.selectbox("Preset", [
-                        "1. ⚡ Alex Hormozi (Yellow Bold + Pop)",
-                        "2. 💎 Cyberpunk Neon (Green + Glow)",
-                        "3. 🌊 Ocean Breeze (Cyan + Shadow)",
-                        "4. 🔥 Sunset Blaze (Orange Gradient)",
-                        "5. 👑 Royal Gold (Metallic Gold)",
-                        "6. 🚀 TikTok Viral (Electric Blue)",
-                        "7. 🩸 Matrix Code (Lime Green)",
-                        "8. 🎯 Minimalist Clean (White)",
-                        "9. 🚨 Emergency Alert (Blood Red)",
-                        "10. 💜 Purple Haze (Neon Purple)",
-                        "11. 🍋 Lemon Punch (Vibrant Yellow)",
-                        "12. ⚡ Flash White (Thick Border)",
-                        "13. 🍊 Tangerine Dream (Neon Orange)",
-                        "14. 🧊 Ice Glacier (Ice Blue)",
-                        "15. 🥑 Avocado Pop (Neon Lime)",
-                        "16. 🔮 Mystic Violet (Magenta)",
-                        "17. 🍫 Caramel Gold (Warm Amber)",
-                        "18. 🧨 Firecracker (Bright Coral)",
-                        "19. 🌿 Emerald Fresh (Mint Green)",
-                        "20. 🦄 Cyber Unicorn (Dual Tone)"
-                    ], index=0)
-
-                with r1_col2:
                     font_choice = st.selectbox("Font", [
                         "1. Montserrat Black", "2. Impact Pro", "3. Arial Black", "4. Comic Neue Bold",
                         "5. Trebuchet MS Bold", "6. Ubuntu Bold", "7. Liberation Sans Bold", "8. DejaVu Sans Bold",
-                        "9. Inter Heavy", "10. Roboto Black", "11. Poppins ExtraBold", "12. Oswald Bold",
+                        "9. Inter Heavy", "10. Roboto Black", "11. Poppins ExtraBold (Viral)", "12. Oswald Bold",
                         "13. Anton Regular", "14. Bebas Neue Pro", "15. Nunito ExtraBold", "16. Raleway Black",
                         "17. Quicksand Bold", "18. Playfair Display Bold", "19. Merriweather Bold", "20. Fira Code Bold",
                         "21. JetBrains Mono Bold", "22. Space Grotesk Bold", "23. Syne ExtraBold", "24. DM Sans Bold",
@@ -147,38 +151,55 @@ if os.path.exists(video_path):
                         "41. Bangers Regular", "42. Fredoka One", "43. Titan One", "44. Luckiest Guy",
                         "45. Chewy Regular", "46. Permanent Marker", "47. Amatic SC Bold", "48. Shadows Into Light",
                         "49. Righteous Regular", "50. Bungee Inline"
-                    ], index=0)
+                    ], index=10)
 
-                r2_col1, r2_col2 = st.columns(2)
-                with r2_col1:
+                with r1_col2:
                     caption_align = st.selectbox("Position", [
                         "Bottom (Safe Zone)", 
                         "Middle-Center", 
                         "Top (Safe Zone)"
                     ], index=0)
 
-                with r2_col2:
+                r2_col1, r2_col2 = st.columns(2)
+                with r2_col1:
                     font_size_option = st.selectbox("Font Size", ["Small (18px)", "Medium (24px - Rec)", "Large (32px)", "Extra Large (40px)"], index=1)
                     font_size_map = {"Small (18px)": 18, "Medium (24px - Rec)": 24, "Large (32px)": 32, "Extra Large (40px)": 40}
                     font_size = font_size_map[font_size_option]
-
-                r3_col1, r3_col2 = st.columns(2)
-                with r3_col1:
+                with r2_col2:
                     words_per_line_option = st.selectbox("Words Per Line", ["1 Word", "2 Words (Recommended)", "3 Words", "4 Words", "5 Words"], index=1)
                     wpl_map = {"1 Word": 1, "2 Words (Recommended)": 2, "3 Words": 3, "4 Words": 4, "5 Words": 5}
                     words_per_line = wpl_map[words_per_line_option]
-                with r3_col2:
+
+                r3_col1, r3_col2 = st.columns(2)
+                with r3_col1:
                     video_speed = st.selectbox("Video Speed (Retention)", ["1.0x (Normal)", "1.1x (Fast Viral)", "1.25x (Super Fast)"], index=0)
                     speed_val = 1.0 if "1.0x" in video_speed else (1.1 if "1.1x" in video_speed else 1.25)
+                with r3_col2:
+                    # Cinematic Filters Categorized Selection
+                    filter_category = st.selectbox("Filter Category", [
+                        "High Quality & Aesthetic Filters (For Face & Body)",
+                        "🎬 Cinematic & Vibe Filters (For Travel & Vlogs)",
+                        "🤖 Viral AI & Special Effects Filters"
+                    ], index=0)
 
-                # Reordered: Style and Effects moved up, Horizontal Flip moved down
+                if filter_category == "High Quality & Aesthetic Filters (For Face & Body)":
+                    specific_filter = st.selectbox("Select Filter", ["iPhone HD", "HD Glamour Filter", "Flash CCD", "Universal Sunset", "Bold Glamour", "Bubblegum"], index=0)
+                elif filter_category == "🎬 Cinematic & Vibe Filters (For Travel & Vlogs)":
+                    specific_filter = st.selectbox("Select Filter", ["Cinematic Glow / HD", "Green Lake", "Renoir / Reno", "Moon Rise", "Bad Bunny", "Cool Vibes"], index=0)
+                else:
+                    specific_filter = st.selectbox("Select Filter", ["Cartoon Filter AI", "Barbie Girl AI / Princess", "Kid Teen Now Aged", "Falling Filter", "2016 Filter", "Velocity x Color AD", "Thermal Effect", "Dreamy Halo"], index=0)
+
                 r4_col1, r4_col2 = st.columns(2)
                 with r4_col1:
-                    clipchamp_effect = st.selectbox("✨ Style and Effects", ["None", "Soft Vignette Glow", "VHS Glitch Overlay", "Cinematic Letterbox (Cinemascope)", "Bokeh Blur Background Touch"], index=0)
+                    style_effect = st.selectbox("Style and Effects", [
+                        "None",
+                        "AI Autofill", "Velocity (Auto Velocity)", "3D Zoom Pro", "AI Manga / Anime", "Cyberpunk / Neon Style", "Face Ageing (Old Age)", "Glitch Portrait",
+                        "Glowing Lines", "Angel Wings / Demon Wings", "Lightning Eyes (Laser Eyes)", "Blur / Halo Blur", "Electro-Optical Face",
+                        "Camera Shake", "Rebound Swing", "Flash / Black Flash", "Horizontal Shake / Jiggle", "Soft Vignette Glow", "VHS Glitch Overlay", "Cinematic Letterbox (Cinemascope)"
+                    ], index=0)
                 with r4_col2:
-                    color_filter = st.selectbox("Cinematic Filter", ["Normal", "Cyberpunk Glow", "High Contrast", "Warm Cinematic", "Vintage Film 70s", "HDR Vibrant"], index=0)
+                    enable_flip = st.checkbox("🔄 Horizontal Flip (Anti-Copyright)", value=False)
 
-                enable_flip = st.checkbox("🔄 Horizontal Flip (Anti-Copyright)", value=False)
                 enable_face_tracking = st.checkbox("Enable Smart AI Face Tracking", value=True)
 
                 st.markdown("---")
@@ -200,21 +221,15 @@ if os.path.exists(video_path):
                 if enable_flip:
                     vf_parts.append("hflip")
                 
-                if color_filter == "Cyberpunk Glow":
-                    vf_parts.append("eq=saturation=1.4:contrast=1.2")
-                elif color_filter == "High Contrast":
-                    vf_parts.append("eq=contrast=1.3:brightness=0.05")
-                elif color_filter == "Warm Cinematic":
-                    vf_parts.append("colorbalance=rm=0.1:bm=-0.1")
-                elif color_filter == "Vintage Film 70s":
-                    vf_parts.append("eq=saturation=0.7:contrast=1.1,colorbalance=rm=0.2:gm=0.1")
-                elif color_filter == "HDR Vibrant":
-                    vf_parts.append("unsharp=3:3:1.5:3:3:0.5")
+                # Active filter application
+                f_str = get_filter_ffmpeg_string(filter_category, specific_filter)
+                if f_str:
+                    vf_parts.append(f_str)
 
-                if clipchamp_effect == "Cinematic Letterbox (Cinemascope)":
-                    vf_parts.append("drawbox=y=0:h=ih/10:color=black:t=fill,drawbox=y=ih-ih/10:h=ih/10:color=black:t=fill")
-                elif clipchamp_effect == "Soft Vignette Glow":
-                    vf_parts.append("vignette=PI/4")
+                # Active style & effect application
+                e_str = get_style_effect_ffmpeg_string(style_effect)
+                if e_str:
+                    vf_parts.append(e_str)
 
                 vf_parts.append("scale=540:960")
                 vf_preview_str = ",".join(vf_parts)
@@ -228,34 +243,14 @@ if os.path.exists(video_path):
                     img = Image.open(preview_path)
                     draw = ImageDraw.Draw(img)
                     
-                    if "Hormozi" in style_preset or "Lemon" in style_preset:
-                        text_color, outline_color, anim_effect = "#FFFF00", "#000000", "Pop-In Scale"
-                    elif "Cyberpunk" in style_preset or "Matrix" in style_preset:
-                        text_color, outline_color, anim_effect = "#00FF00", "#000000", "Pop-In Scale"
-                    elif "Ocean" in style_preset or "Ice" in style_preset:
-                        text_color, outline_color, anim_effect = "#00FFFF", "#000066", "Fade In"
-                    elif "Sunset" in style_preset or "Tangerine" in style_preset:
-                        text_color, outline_color, anim_effect = "#FF8000", "#000000", "Pop-In Scale"
-                    elif "Royal" in style_preset:
-                        text_color, outline_color, anim_effect = "#FFD700", "#330000", "Pop-In Scale"
-                    elif "Emergency" in style_preset or "Firecracker" in style_preset:
-                        text_color, outline_color, anim_effect = "#FF0000", "#FFFFFF", "Standard"
-                    else:
-                        text_color, outline_color, anim_effect = "#FFFFFF", "#000000", "Fade In"
-
+                    text_color, outline_color = ("#FFFF00", "#000000") if "Hormozi" in style_preset else ("#FFFFFF", "#000000")
                     w, h = img.size
                     sample_words = ["CLIPPING", "PREVIEW", "TEXT"]
                     raw_text = " ".join(sample_words[:words_per_line])
                     
-                    if "Pop-In" in anim_effect:
-                        raw_text = "💥 " + raw_text
-                    elif "Fade" in anim_effect:
-                        raw_text = "✨ " + raw_text
-
                     wrapped_lines = textwrap.wrap(raw_text, width=14)
                     wrapped_text = "\n".join(wrapped_lines)
 
-                    # Dynamic pro font loader from fonts.py
                     font = get_pro_font(font_choice, font_size)
 
                     if "Top" in caption_align:
@@ -325,21 +320,13 @@ if os.path.exists(video_path):
                 if enable_flip:
                     render_vf_parts.append("hflip")
                 
-                if color_filter == "Cyberpunk Glow":
-                    render_vf_parts.append("eq=saturation=1.4:contrast=1.2")
-                elif color_filter == "High Contrast":
-                    render_vf_parts.append("eq=contrast=1.3:brightness=0.05")
-                elif color_filter == "Warm Cinematic":
-                    render_vf_parts.append("colorbalance=rm=0.1:bm=-0.1")
-                elif color_filter == "Vintage Film 70s":
-                    render_vf_parts.append("eq=saturation=0.7:contrast=1.1,colorbalance=rm=0.2:gm=0.1")
-                elif color_filter == "HDR Vibrant":
-                    render_vf_parts.append("unsharp=3:3:1.5:3:3:0.5")
+                f_str = get_filter_ffmpeg_string(filter_category, specific_filter)
+                if f_str:
+                    render_vf_parts.append(f_str)
 
-                if clipchamp_effect == "Cinematic Letterbox (Cinemascope)":
-                    render_vf_parts.append("drawbox=y=0:h=ih/10:color=black:t=fill,drawbox=y=ih-ih/10:h=ih/10:color=black:t=fill")
-                elif clipchamp_effect == "Soft Vignette Glow":
-                    render_vf_parts.append("vignette=PI/4")
+                e_str = get_style_effect_ffmpeg_string(style_effect)
+                if e_str:
+                    render_vf_parts.append(e_str)
 
                 render_vf_parts.append("scale=1080:1920")
                 
@@ -371,20 +358,8 @@ if os.path.exists(video_path):
                     align_map = {"Top (Safe Zone)": "6", "Middle-Center": "5", "Bottom (Safe Zone)": "2"}
                     align_val = align_map[caption_align]
                     
-                    if "Hormozi" in style_preset or "Lemon" in style_preset:
-                        ass_color, anim_tag_type = "&H0000FFFF", "pop"
-                    elif "Cyberpunk" in style_preset or "Matrix" in style_preset:
-                        ass_color, anim_tag_type = "&H00FF0000", "pop"
-                    elif "Ocean" in style_preset or "Ice" in style_preset:
-                        ass_color, anim_tag_type = "&H00FFFF00", "fade"
-                    elif "Sunset" in style_preset:
-                        ass_color, anim_tag_type = "&H000080FF", "pop"
-                    elif "Royal" in style_preset:
-                        ass_color, anim_tag_type = "&H0000D7FF", "pop"
-                    else:
-                        ass_color, anim_tag_type = "&H00FFFFFF", "fade"
-
-                    ass_font_name = "Liberation Serif" if any(x in font_choice for x in ["Playfair", "Lora", "Merriweather", "Serif"]) else "Liberation Sans"
+                    ass_color = "&H0000FFFF" if "Hormozi" in style_preset else "&H00FFFFFF"
+                    ass_font_name = "Liberation Sans"
 
                     result = model.transcribe(cropped_file, word_timestamps=True)
                     ass_file = f"subs_{clip_num}.ass"
@@ -418,12 +393,7 @@ if os.path.exists(video_path):
                                     s_str = f"{int(s_h)}:{int(s_m):02d}:{int(s_s):02d}.{int((start_t%1)*100):02d}"
                                     e_str = f"{int(e_h)}:{int(e_m):02d}:{int(e_s):02d}.{int((end_t%1)*100):02d}"
                                     
-                                    if anim_tag_type == "pop":
-                                        anim_tag = r"{\t(0,80,\fscx115\fscy115)\t(80,160,\fscx100\fscy100)}"
-                                    elif anim_tag_type == "fade":
-                                        anim_tag = r"{\fad(100,100)}"
-                                    else:
-                                        anim_tag = ""
+                                    anim_tag = r"{\t(0,80,\fscx115\fscy115)\t(80,160,\fscx100\fscy100)}" if "Hormozi" in style_preset else ""
                                         
                                     f.write(f"Dialogue: 0,{s_str},{e_str},Default,,0,0,0,,{anim_tag}{text_str}\n")
 
