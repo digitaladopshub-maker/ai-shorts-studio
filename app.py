@@ -42,12 +42,10 @@ def detect_face_center(v_path, start_sec):
     return None
 
 def get_font_path(font_choice):
-    # Distinct system font mapping so changing dropdown visibly changes the font style
     font_pools = {
         "serif": [
             "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
-            "/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf"
+            "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf"
         ],
         "mono": [
             "/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf",
@@ -61,13 +59,11 @@ def get_font_path(font_choice):
             "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
         ]
     }
-    
-    # Categorize based on font name to provide visual variety
-    if any(x in font_choice for x in ["Playfair", "Lora", "Merriweather", "Crimson", "Cinzel", "Serif", "Times"]):
+    if any(x in font_choice for x in ["Playfair", "Lora", "Merriweather", "Crimson", "Cinzel", "Serif"]):
         pool = font_pools["serif"]
-    elif any(x in font_choice for x in ["Mono", "Code", "JetBrains", "Fira", "Ubuntu"]):
+    elif any(x in font_choice for x in ["Mono", "Code", "JetBrains", "Fira"]):
         pool = font_pools["mono"]
-    elif any(x in font_choice for x in ["Comic", "Caveat", "Pacifico", "Lobster", "Sriracha", "Hand", "Shadows"]):
+    elif any(x in font_choice for x in ["Comic", "Caveat", "Pacifico", "Lobster", "Sriracha"]):
         pool = font_pools["clean"]
     else:
         pool = font_pools["heavy"]
@@ -75,12 +71,6 @@ def get_font_path(font_choice):
     for f in pool:
         if os.path.exists(f):
             return f
-            
-    # Absolute fallback
-    for cat in font_pools.values():
-        for f in cat:
-            if os.path.exists(f):
-                return f
     return "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
 with st.sidebar:
@@ -148,6 +138,7 @@ if os.path.exists(video_path):
             col_controls, col_preview = st.columns([1.5, 0.7])
             
             with col_controls:
+                # Row 1: Preset & Font
                 r1_col1, r1_col2 = st.columns(2)
                 with r1_col1:
                     style_preset = st.selectbox("Preset", [
@@ -190,6 +181,7 @@ if os.path.exists(video_path):
                         "49. Righteous Regular", "50. Bungee Inline"
                     ], index=0)
 
+                # Row 2: Position & Font Size
                 r2_col1, r2_col2 = st.columns(2)
                 with r2_col1:
                     caption_align = st.selectbox("Position", [
@@ -203,32 +195,58 @@ if os.path.exists(video_path):
                     font_size_map = {"Small (18px)": 18, "Medium (24px - Rec)": 24, "Large (32px)": 32, "Extra Large (40px)": 40}
                     font_size = font_size_map[font_size_option]
 
-                words_per_line_option = st.selectbox("Words Per Line", ["1 Word", "2 Words (Recommended)", "3 Words", "4 Words", "5 Words"], index=1)
-                wpl_map = {"1 Word": 1, "2 Words (Recommended)": 2, "3 Words": 3, "4 Words": 4, "5 Words": 5}
-                words_per_line = wpl_map[words_per_line_option]
+                # Row 3: Words per line & Speed Side-by-Side
+                r3_col1, r3_col2 = st.columns(2)
+                with r3_col1:
+                    words_per_line_option = st.selectbox("Words Per Line", ["1 Word", "2 Words (Recommended)", "3 Words", "4 Words", "5 Words"], index=1)
+                    wpl_map = {"1 Word": 1, "2 Words (Recommended)": 2, "3 Words": 3, "4 Words": 4, "5 Words": 5}
+                    words_per_line = wpl_map[words_per_line_option]
+                with r3_col2:
+                    video_speed = st.selectbox("Video Speed (Retention)", ["1.0x (Normal)", "1.1x (Fast Viral)", "1.25x (Super Fast)"], index=0)
+                    speed_val = 1.0 if "1.0x" in video_speed else (1.1 if "1.1x" in video_speed else 1.25)
 
-                prev_sec = clip_ranges[0][0] if (clip_mode == "Manual Timestamps (Precise)" and clip_ranges) else "0"
-                if st.button("🔄 Refresh Preview Frame", use_container_width=True):
-                    st.session_state.frame_time = prev_sec
-                    if os.path.exists(preview_path):
-                        os.remove(preview_path)
+                # Row 4: Copyright Protection & Filters Side-by-Side
+                r4_col1, r4_col2 = st.columns(2)
+                with r4_col1:
+                    enable_flip = st.checkbox("🔄 Horizontal Flip (Anti-Copyright)", value=False)
+                with r4_col2:
+                    color_filter = st.selectbox("Cinematic Filter", ["Normal", "Cyberpunk Glow", "High Contrast", "Warm Cinematic"], index=0)
 
+                # Face Tracking right below
                 enable_face_tracking = st.checkbox("🤖 Enable Smart AI Face Tracking (Center Crop on Speaker)", value=True)
 
                 st.markdown("---")
                 render_clicked = st.button("🚀 Render Shorts Batch Now", type="primary", use_container_width=True)
 
             with col_preview:
-                target_time = st.session_state.frame_time if st.session_state.frame_time else prev_sec
+                # Instant automatic live preview (No refresh button needed!)
+                target_time = clip_ranges[0][0] if (clip_mode == "Manual Timestamps (Precise)" and clip_ranges) else "0"
                 
-                vf_crop = "crop=ih*9/16:ih,scale=540:960"
+                vf_parts = []
                 if enable_face_tracking:
                     f_x = detect_face_center(video_path, target_time)
                     if f_x:
-                        vf_crop = f"crop=ih*9/16:ih:clamp(x={f_x}-ih*9/32\\,0\\,in_w-ih*9/16):0,scale=540:960"
+                        vf_parts.append(f"crop=ih*9/16:ih:clamp(x={f_x}-ih*9/32\\,0\\,in_w-ih*9/16):0")
+                    else:
+                        vf_parts.append("crop=ih*9/16:ih")
+                else:
+                    vf_parts.append("crop=ih*9/16:ih")
+
+                if enable_flip:
+                    vf_parts.append("hflip")
+                
+                if color_filter == "Cyberpunk Glow":
+                    vf_parts.append("eq=saturation=1.4:contrast=1.2")
+                elif color_filter == "High Contrast":
+                    vf_parts.append("eq=contrast=1.3:brightness=0.05")
+                elif color_filter == "Warm Cinematic":
+                    vf_parts.append("colorbalance=rm=0.1:bm=-0.1")
+
+                vf_parts.append("scale=540:960")
+                vf_preview_str = ",".join(vf_parts)
 
                 subprocess.run(
-                    f'ffmpeg -y -ss {target_time} -i "{video_path}" -vframes 1 -vf "{vf_crop}" "{preview_path}"', 
+                    f'ffmpeg -y -ss {target_time} -i "{video_path}" -vframes 1 -vf "{vf_preview_str}" "{preview_path}"', 
                     shell=True, capture_output=True
                 )
                 
@@ -263,7 +281,6 @@ if os.path.exists(video_path):
                     wrapped_lines = textwrap.wrap(raw_text, width=14)
                     wrapped_text = "\n".join(wrapped_lines)
 
-                    # Apply Selected Font Dynamically
                     selected_fpath = get_font_path(font_choice)
                     try:
                         font = ImageFont.truetype(selected_fpath, int(font_size * 1.6))
@@ -319,20 +336,45 @@ if os.path.exists(video_path):
         model = whisper.load_model("base") if enable_subs else None
         generated_clips = []
 
-        with st.spinner("Processing High-Quality Shorts with Clipping Engine..."):
+        with st.spinner("Processing High-Quality Professional Shorts..."):
             for clip_num, start_sec, duration_sec in tasks:
                 cropped_file = f"cropped_{clip_num}.mp4"
                 final_file = f"final_short_{clip_num}.mp4"
                 
-                vf_crop_hd = "crop=ih*9/16:ih,scale=1080:1920"
+                # Build Full Render FFmpeg Filter String with Face Tracking, Flip, Filters & Speed
+                render_vf_parts = []
                 if enable_face_tracking:
                     f_x = detect_face_center(video_path, start_sec)
                     if f_x:
-                        vf_crop_hd = f"crop=ih*9/16:ih:clamp(x={f_x}-ih*9/32\\,0\\,in_w-ih*9/16):0,scale=1080:1920"
+                        render_vf_parts.append(f"crop=ih*9/16:ih:clamp(x={f_x}-ih*9/32\\,0\\,in_w-ih*9/16):0")
+                    else:
+                        render_vf_parts.append("crop=ih*9/16:ih")
+                else:
+                    render_vf_parts.append("crop=ih*9/16:ih")
+
+                if enable_flip:
+                    render_vf_parts.append("hflip")
+                
+                if color_filter == "Cyberpunk Glow":
+                    render_vf_parts.append("eq=saturation=1.4:contrast=1.2")
+                elif color_filter == "High Contrast":
+                    render_vf_parts.append("eq=contrast=1.3:brightness=0.05")
+                elif color_filter == "Warm Cinematic":
+                    render_vf_parts.append("colorbalance=rm=0.1:bm=-0.1")
+
+                render_vf_parts.append("scale=1080:1920")
+                
+                if speed_val != 1.0:
+                    render_vf_parts.append(f"setpts=PTS/{speed_val}")
+
+                render_vf_str = ",".join(render_vf_parts)
+
+                # Audio speed filter mapping if speed is changed
+                audio_filter_str = f"atempo={speed_val}" if speed_val != 1.0 else "anull"
 
                 crop_cmd = (
                     f'ffmpeg -y -ss {start_sec} -i "{video_path}" -t {duration_sec} '
-                    f'-vf "{vf_crop_hd}" '
+                    f'-vf "{render_vf_str}" -af "{audio_filter_str}" '
                     f'-c:v libx264 -preset ultrafast -crf 20 -c:a aac "{cropped_file}"'
                 )
                 subprocess.run(crop_cmd, shell=True)
