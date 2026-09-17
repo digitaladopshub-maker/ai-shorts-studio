@@ -2,55 +2,49 @@ import os
 from PIL import ImageFont
 
 def get_pro_font(font_choice, font_size):
-    # Expanded foolproof font paths available across Linux & Streamlit Cloud containers
-    font_pool = [
-        "/usr/share/fonts/truetype/msttcorefonts/Impact.ttf",
-        "/usr/share/fonts/truetype/msttcorefonts/Arial_Black.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf"
-    ]
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    FONT_DIR = os.path.join(BASE_DIR, "fonts")
     
-    # Filter only existing files on the server
-    available_fonts = [f for f in font_pool if os.path.exists(f)]
+    # Default fallback font jo sabse pehle check hoga
+    default_font_name = "Impact.ttf"
+    default_path = os.path.join(FONT_DIR, default_font_name)
     
-    if not available_fonts:
-        return ImageFont.load_default()
-
-    # Smart mapping based on user selection
-    selected_path = available_fonts[0]
-    choice_lower = font_choice.lower()
+    choice_lower = font_choice.lower().strip()
     
+    # Exact mapping matching your uploaded files in the fonts folder
     if "impact" in choice_lower:
-        for f in available_fonts:
-            if "Impact" in f:
-                selected_path = f
-                break
-    elif any(x in choice_lower for x in ["arial", "black", "heavy", "pro", "anton", "bebas", "montserrat", "poppins", "roboto", "ubuntu", "comic", "trebuchet", "oswald", "raleway"]):
-        for f in available_fonts:
-            if "Arial_Black" in f or "LiberationSans" in f or "DejaVuSans" in f:
-                selected_path = f
-                break
-    elif any(x in choice_lower for x in ["serif", "playfair", "lora", "merriweather", "crimson", "cinzel"]):
-        for f in available_fonts:
-            if "Serif" in f:
-                selected_path = f
-                break
-    elif any(x in choice_lower for x in ["mono", "code", "jetbrains", "fira", "space"]):
-        for f in available_fonts:
-            if "Mono" in f:
-                selected_path = f
-                break
+        selected_file = "Impact.ttf"
+    elif "bebas" in choice_lower:
+        selected_file = "BebasNeue-Regular.ttf"
+    elif "montserrat" in choice_lower:
+        selected_file = "Montserrat-VariableFont_wght.ttf"
+    elif "roboto" in choice_lower:
+        if "bold" in choice_lower:
+            selected_file = "Roboto-Bold.ttf"
+        else:
+            selected_file = "Roboto-Regular.ttf"
+    elif "popping" in choice_lower or "cute" in choice_lower:
+        selected_file = "Popping-Cute.ttf"
+    elif "antonio" in choice_lower:
+        selected_file = "AntonioZull-Brush.ttf"
+    elif "san antonio" in choice_lower or "charros" in choice_lower:
+        selected_file = "San Antonio Charros_personal_use_only.ttf"
+    elif "interact" in choice_lower:
+        selected_file = "Interact.ttf"
+    else:
+        selected_file = "Impact.ttf"
 
-    # Apply scaling factor safely
+    selected_path = os.path.join(FONT_DIR, selected_file)
+    
+    if not os.path.exists(selected_path):
+        if os.path.exists(default_path):
+            selected_path = default_path
+        else:
+            return ImageFont.load_default()
+
     final_px = max(int(font_size * 2.2), 12)
     
     try:
         return ImageFont.truetype(selected_path, final_px)
     except Exception:
-        try:
-            return ImageFont.truetype(available_fonts[0], final_px)
-        except Exception:
-            return ImageFont.load_default()
+        return ImageFont.load_default()
