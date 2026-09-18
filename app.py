@@ -301,7 +301,6 @@ with col_left:
                 wrapped_lines = textwrap.wrap(raw_text, width=wrap_width)
                 wrapped_text = "\n".join(wrapped_lines)
 
-                # EXACT PROPORTIONAL FONT CALCULATION FOR PREVIEW TO MATCH OUTPUT VIDEO
                 preview_calc_size = int(font_size * (preview_scale_h / scale_h) * 2.2)
                 font = get_pro_font(font_choice, preview_calc_size)
 
@@ -367,7 +366,7 @@ if os.path.exists(video_path) and render_clicked:
             render_vf_parts.append(f"scale={scale_w}:{scale_h}")
             
             if speed_val != 1.0:
-                render_vf_parts.append(setpts=PTS/{speed_val})
+                render_vf_parts.append(f"setpts=PTS/{speed_val}")
 
             render_vf_str = ",".join(render_vf_parts)
             audio_filter_str = f"atempo={speed_val}" if speed_val != 1.0 else "anull"
@@ -398,7 +397,17 @@ if os.path.exists(video_path) and render_clicked:
                 align_val = align_map[caption_align]
                 
                 text_col, _, _, _, ass_color = get_subtitle_styling(style_preset)
-                ass_font_name = "Liberation Sans"
+                
+                # DYNAMIC FONT MAPPING FOR RENDERED ASS SUBTITLES TO MATCH USER SELECTION
+                base_dir_path = os.path.dirname(os.path.abspath(__file__))
+                fonts_folder_path = os.path.join(base_dir_path, "fonts")
+                selected_ttf_file = font_choice if font_choice.endswith(".ttf") else font_choice + ".ttf"
+                full_font_path = os.path.join(fonts_folder_path, selected_ttf_file)
+                
+                if os.path.exists(full_font_path):
+                    ass_font_name = full_font_path
+                else:
+                    ass_font_name = "Liberation Sans"
 
                 result = model.transcribe(whisper_audio_path if os.path.exists(whisper_audio_path) else cropped_file, word_timestamps=True)
                 ass_file = os.path.join(DOWNLOAD_DIR, f"subs_{clip_num}.ass")
@@ -408,7 +417,9 @@ if os.path.exists(video_path) and render_clicked:
                     f.write("[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
                     
                     margin_v_val = int(scale_h * 0.12) if "Bottom" in caption_align else (int(scale_h * 0.1) if "Top" in caption_align else int(scale_h * 0.5))
-                    render_ass_fontsize = int(font_size * (scale_h / 800))
+                    
+                    # PROPORTIONAL FONT SIZE SCALING FOR OUTPUT RENDERING
+                    render_ass_fontsize = int(font_size * (scale_h / 480) * 1.5)
                     
                     f.write(f"Style: Default,{ass_font_name},{render_ass_fontsize},{ass_color},&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},160,160,{margin_v_val},1\n\n")
                     f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
