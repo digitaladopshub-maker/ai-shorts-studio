@@ -51,10 +51,6 @@ with st.sidebar:
     st.header("📥 1. Media Input")
     option = st.radio("Input Method:", ("Upload MP4 File", "Paste URL (YouTube / FB / Insta)"))
 
-with st.sidebar:
-    st.header("📥 1. Media Input")
-    option = st.radio("Input Method:", ("Upload MP4 File", "Paste URL (YouTube / FB / Insta)"))
-
     if option == "Paste URL (YouTube / FB / Insta)":
         video_url = st.text_input("Video URL Paste Karein:")
         if video_url and st.button("Fetch & Download Video"):
@@ -64,7 +60,7 @@ with st.sidebar:
                 if os.path.exists(preview_path):
                     os.remove(preview_path)
                 
-                # Updated bypass command for latest YouTube/SABR restrictions
+                # Robust yt-dlp command updated for latest YouTube restrictions / SABR error bypass
                 dl_cmd = (
                     f'yt-dlp --no-check-certificates --geo-bypass '
                     f'-f "b[ext=mp4]/best[ext=mp4]/best" '
@@ -76,61 +72,16 @@ with st.sidebar:
                 if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
                     st.success("Video Successfully Downloaded!")
                 else:
-                    # Alternative direct fallback command
+                    # Fallback command using iOS client extraction
                     fallback_cmd = f'yt-dlp --no-check-certificates --extractor-args "youtube:player_client=ios" -o "{video_path}" "{video_url}"'
-                    subprocess.run(fallback_cmd, shell=True)
-                    
-                    if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-                        st.success("Video Downloaded via iOS Client Fallback!")
-                    else:
-                        st.error("Download failed! Detailed Error:")
-                        if result.stderr:
-                            st.code(result.stderr)
-                        else:
-                            st.error("Unknown error occurred during download.")
-
-    elif option == "Upload MP4 File":
-        uploaded_file = st.file_uploader("Upload MP4 File", type=["mp4"])
-        if uploaded_file is not None:
-            if os.path.exists(preview_path):
-                os.remove(preview_path)
-            with open(video_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            st.success("File Uploaded!")
-                
-                result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
-                
-                if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-                    st.success("Video Successfully Downloaded!")
-                else:
-                    # Alternative direct fallback command
-                    fallback_cmd = f'yt-dlp --no-check-certificates --extractor-args "youtube:player_client=ios" -o "{video_path}" "{video_url}"'
-                    subprocess.run(fallback_cmd, shell=True)
-                    
-                    if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-                        st.success("Video Downloaded via iOS Client Fallback!")
-                    else:
-                        st.error("Download failed! Detailed Error:")
-                        if result.stderr:
-                            st.code(result.stderr)
-                        else:
-                            st.error("Unknown error occurred during download.")
-                
-                result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
-                
-                if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-                    st.success("Video Successfully Downloaded!")
-                else:
-                    # Fallback command if format merging fails
-                    fallback_cmd = f'yt-dlp --no-check-certificates -o "{video_path}" "{video_url}"'
                     subprocess.run(fallback_cmd, shell=True)
                     
                     if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
                         st.success("Video Downloaded via Fallback!")
                     else:
-                        st.error("Download failed! Link invalid ho sakta hai ya platform ne block kiya hai. Error log check karein.")
+                        st.error("Download failed! Link invalid ho sakta hai ya platform ne block kiya hai.")
                         if result.stderr:
-                            st.text(result.stderr[:300])
+                            st.code(result.stderr[:400])
 
     elif option == "Upload MP4 File":
         uploaded_file = st.file_uploader("Upload MP4 File", type=["mp4"])
