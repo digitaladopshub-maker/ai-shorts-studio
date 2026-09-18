@@ -20,9 +20,14 @@ if 'frame_time' not in st.session_state:
 if 'reset_trigger' not in st.session_state:
     st.session_state.reset_trigger = 0
 
-video_path = "input_video.mp4"
-preview_path = "preview_frame.jpg"
-bg_music_path = "bg_music.mp3"
+# Safe downloads folder ensure karna taake save hone mein koi error na aaye
+DOWNLOAD_DIR = "downloads"
+if not os.path.exists(DOWNLOAD_DIR):
+    os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+video_path = os.path.join(DOWNLOAD_DIR, "input_video.mp4")
+preview_path = os.path.join(DOWNLOAD_DIR, "preview_frame.jpg")
+bg_music_path = os.path.join(DOWNLOAD_DIR, "bg_music.mp3")
 
 def detect_face_center(v_path, start_sec):
     try:
@@ -60,7 +65,7 @@ with st.sidebar:
                 if os.path.exists(preview_path):
                     os.remove(preview_path)
                 
-                # Updated command with remote-components ejs support for YouTube JS challenges
+                # Safe downloads directory path ke sath yt-dlp command
                 dl_cmd = (
                     f'yt-dlp --no-check-certificates --geo-bypass --remote-components ejs:npm '
                     f'-f "b[ext=mp4]/best[ext=mp4]/best" '
@@ -70,13 +75,13 @@ with st.sidebar:
                 result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
                 
                 if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-                    st.success("Video Successfully Downloaded!")
+                    st.success("Video Successfully Downloaded & Saved!")
                 else:
                     fallback_cmd = f'yt-dlp --no-check-certificates --remote-components ejs:npm -o "{video_path}" "{video_url}"'
                     subprocess.run(fallback_cmd, shell=True)
                     
                     if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-                        st.success("Video Downloaded via Fallback!")
+                        st.success("Video Downloaded via Fallback & Saved!")
                     else:
                         st.error("Download failed! Detailed Error:")
                         if result.stderr:
@@ -91,7 +96,7 @@ with st.sidebar:
                 os.remove(preview_path)
             with open(video_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
-            st.success("File Uploaded!")
+            st.success("File Uploaded & Saved!")
 
     st.markdown("---")
     st.header("⚙️ 2. Processing Setup")
@@ -328,8 +333,8 @@ if os.path.exists(video_path):
 
         with st.spinner("Processing High-Quality Professional Shorts..."):
             for clip_num, start_sec, duration_sec in tasks:
-                cropped_file = f"cropped_{clip_num}.mp4"
-                final_file = f"final_short_{clip_num}.mp4"
+                cropped_file = os.path.join(DOWNLOAD_DIR, f"cropped_{clip_num}.mp4")
+                final_file = os.path.join(DOWNLOAD_DIR, f"final_short_{clip_num}.mp4")
                 
                 render_vf_parts = []
                 if enable_face_tracking:
@@ -367,7 +372,7 @@ if os.path.exists(video_path):
                 )
                 subprocess.run(crop_cmd, shell=True)
 
-                mixed_audio_file = f"mixed_{clip_num}.mp4"
+                mixed_audio_file = os.path.join(DOWNLOAD_DIR, f"mixed_{clip_num}.mp4")
                 if enable_bg_music and os.path.exists(bg_music_path):
                     mix_cmd = (
                         f'ffmpeg -y -i "{cropped_file}" -stream_loop -1 -i "{bg_music_path}" '
@@ -386,7 +391,7 @@ if os.path.exists(video_path):
                     ass_font_name = "Liberation Sans"
 
                     result = model.transcribe(cropped_file, word_timestamps=True)
-                    ass_file = f"subs_{clip_num}.ass"
+                    ass_file = os.path.join(DOWNLOAD_DIR, f"subs_{clip_num}.ass")
                     
                     with open(ass_file, "w", encoding="utf-8") as f:
                         f.write("[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\n\n")
