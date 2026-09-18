@@ -397,8 +397,6 @@ if os.path.exists(video_path) and render_clicked:
                 align_val = align_map[caption_align]
                 
                 text_col, _, _, _, ass_color = get_subtitle_styling(style_preset)
-                
-                # GET FONT FAMILY NAME MAPPING
                 ass_font_name = get_font_family(font_choice)
 
                 result = model.transcribe(whisper_audio_path if os.path.exists(whisper_audio_path) else cropped_file, word_timestamps=True)
@@ -427,10 +425,12 @@ if os.path.exists(video_path) and render_clicked:
                                 wrapped_chunk = textwrap.wrap(raw_str, width=render_wrap_width)
                                 text_str = "\\N".join(wrapped_chunk)
                                 
-                                s_m, s_s = divmod(start_t, 60)
-                                s_h, s_m = divmod(s_m, 60)
-                                e_m, e_s = divmod(e_m, 60)
-                                e_h, e_m = divmod(e_m, 60)
+                                # SAFE TIME FORMATTING TO PREVENT NAMEERROR
+                                s_tot_m, s_s = divmod(start_t, 60)
+                                s_h, s_m = divmod(s_tot_m, 60)
+                                
+                                e_tot_m, e_s = divmod(end_t, 60)
+                                e_h, e_m = divmod(e_tot_m, 60)
                                 
                                 s_str = f"{int(s_h)}:{int(s_m):02d}:{int(s_s):02d}.{int((start_t%1)*100):02d}"
                                 e_str = f"{int(e_h)}:{int(e_m):02d}:{int(e_s):02d}.{int((end_t%1)*100):02d}"
