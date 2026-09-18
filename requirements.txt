@@ -1,7 +1,5 @@
 streamlit
-git+https://github.com/openai/whisper.git
+git+https://github.com
 opencv-python-headless
 Pillow
-whisper-openai
-yt-dlp[default]
-yt-dlp-ejs
+yt-dlp
