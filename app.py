@@ -2,6 +2,7 @@ import streamlit as st
 import whisper
 import subprocess
 import os
+import shutil
 import textwrap
 import cv2
 from PIL import Image, ImageDraw
@@ -28,6 +29,21 @@ if 'reset_trigger' not in st.session_state:
 DOWNLOAD_DIR = "downloads"
 if not os.path.exists(DOWNLOAD_DIR):
     os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+# --- AUTO-REGISTER CUSTOM FONTS FOR FFMPEG/LIBASS ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOCAL_FONT_DIR = os.path.join(BASE_DIR, "fonts")
+USER_FONT_DIR = os.path.expanduser("~/.local/share/fonts")
+os.makedirs(USER_FONT_DIR, exist_ok=True)
+
+if os.path.exists(LOCAL_FONT_DIR):
+    for f_name in os.listdir(LOCAL_FONT_DIR):
+        if f_name.endswith(".ttf"):
+            src_p = os.path.join(LOCAL_FONT_DIR, f_name)
+            dst_p = os.path.join(USER_FONT_DIR, f_name)
+            if not os.path.exists(dst_p):
+                shutil.copy(src_p, dst_p)
+    subprocess.run("fc-cache -f", shell=True, capture_output=True)
 
 video_path = os.path.join(DOWNLOAD_DIR, "input_video.mp4")
 preview_path = os.path.join(DOWNLOAD_DIR, "preview_frame.jpg")
@@ -398,16 +414,8 @@ if os.path.exists(video_path) and render_clicked:
                 
                 text_col, _, _, _, ass_color = get_subtitle_styling(style_preset)
                 
-                # DYNAMIC FONT MAPPING FOR RENDERED ASS SUBTITLES TO MATCH USER SELECTION
-                base_dir_path = os.path.dirname(os.path.abspath(__file__))
-                fonts_folder_path = os.path.join(base_dir_path, "fonts")
-                selected_ttf_file = font_choice if font_choice.endswith(".ttf") else font_choice + ".ttf"
-                full_font_path = os.path.join(fonts_folder_path, selected_ttf_file)
-                
-                if os.path.exists(full_font_path):
-                    ass_font_name = full_font_path
-                else:
-                    ass_font_name = "Liberation Sans"
+                # PASS SELECTED FONT NAME TO ASS ENGINE (REGISTERED VIA FONTCONFIG)
+                ass_font_name = font_choice
 
                 result = model.transcribe(whisper_audio_path if os.path.exists(whisper_audio_path) else cropped_file, word_timestamps=True)
                 ass_file = os.path.join(DOWNLOAD_DIR, f"subs_{clip_num}.ass")
@@ -418,7 +426,6 @@ if os.path.exists(video_path) and render_clicked:
                     
                     margin_v_val = int(scale_h * 0.12) if "Bottom" in caption_align else (int(scale_h * 0.1) if "Top" in caption_align else int(scale_h * 0.5))
                     
-                    # PROPORTIONAL FONT SIZE SCALING FOR OUTPUT RENDERING
                     render_ass_fontsize = int(font_size * (scale_h / 480) * 1.5)
                     
                     f.write(f"Style: Default,{ass_font_name},{render_ass_fontsize},{ass_color},&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},160,160,{margin_v_val},1\n\n")
