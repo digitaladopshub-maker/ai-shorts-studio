@@ -11,10 +11,12 @@ from subtitle_engine import get_subtitle_styling
 
 st.set_page_config(page_title="AI Clipping Studio", layout="wide", initial_sidebar_state="collapsed")
 
+# Custom styling for professional look and fixed preview container
 st.markdown("""
     <style>
-        .main-title { font-size: 28px; font-weight: 700; color: #111827; margin-bottom: 0px; }
-        .sub-text { font-size: 14px; color: #6b7280; margin-bottom: 20px; }
+        .main-title { font-size: 26px; font-weight: 700; color: #111827; margin-bottom: 0px; }
+        .sub-text { font-size: 13px; color: #6b7280; margin-bottom: 15px; }
+        div.stButton > button:first-child { border-radius: 8px; font-weight: 600; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -59,37 +61,133 @@ def detect_face_center(v_path, start_sec):
 st.markdown('<p class="main-title">AI Clipping</p>', unsafe_allow_html=True)
 st.markdown('<p class="sub-text">Transform your long video into multiple highlight reels—in just one click!</p>', unsafe_allow_html=True)
 
-# --- GLOBAL OUTPUT FORMAT SELECTION (So it controls preview & output dynamically) ---
-col_fmt1, col_fmt2 = st.columns([2, 2])
-with col_fmt1:
-    st.markdown("### 📐 Output Format")
-    output_format = st.radio(
-        "Select Format", 
-        ["9:16 Vertical", "16:9 Landscape", "1:1 Square"], 
-        horizontal=True, 
-        label_visibility="collapsed"
-    )
+# --- MAIN LAYOUT SPLIT (Left: Preview / Input, Right: Controls & Formats) ---
+col_left, col_right = st.columns([1.0, 1.3], gap="large")
 
-# Dynamic dimensions mapping for preview and rendering
-if "9:16" in output_format:
-    scale_w, scale_h = 1080, 1920
-    crop_filter = "crop=ih*9/16:ih"
-elif "16:9" in output_format:
-    scale_w, scale_h = 1920, 1080
-    crop_filter = "crop=iw:iw*9/16"
-else: # 1:1 Square
-    scale_w, scale_h = 1080, 1080
-    crop_filter = "crop=ih:ih"
+with col_right:
+    # --- 1. TOP SECTION OF RIGHT COLUMN: Clip Duration & Output Format side-by-side ---
+    rc_1, rc_2 = st.columns(2)
+    
+    with rc_1:
+        st.markdown("### Clip duration")
+        clip_duration_preset = st.selectbox(
+            "Duration Option", 
+            ["Auto (0-3 min)", "Under 30s", "30s - 60s", "1 - 3 min", "3+ min"], 
+            label_visibility="collapsed"
+        )
+        
+    with rc_2:
+        st.markdown("### Output Format")
+        output_format = st.radio(
+            "Output Format Options", 
+            ["9:16 Vertical", "16:9 Landscape", "1:1 Square"], 
+            horizontal=True, 
+            label_visibility="collapsed"
+        )
 
-st.markdown("---")
+    # Dimension and crop configurations based on Output Format selection
+    if "9:16" in output_format:
+        scale_w, scale_h = 1080, 1920
+        crop_filter = "crop=ih*9/16:ih"
+        preview_width = 320
+    elif "16:9" in output_format:
+        scale_w, scale_h = 1920, 1080
+        crop_filter = "crop=iw:iw*9/16"
+        preview_width = 450
+    else: # 1:1 Square
+        scale_w, scale_h = 1080, 1080
+        crop_filter = "crop=ih:ih"
+        preview_width = 350
 
-# --- MAIN LAYOUT SPLIT ---
-col_left, col_right = st.columns([1.1, 1.2], gap="large")
+    st.markdown("---")
+
+    # --- 2. CAPTION STYLE SECTION ---
+    st.markdown("### Caption Style")
+    caption_style_options = [
+        "None", "Subtle Gray", "Shadow Mint", "Subtle Cyan", "Stamp Red", 
+        "Retro Gold", "Block Dark", "Racing", "Modern Dark", "Modern Boxed", 
+        "Chunky", "Clean", "Shadow Lime", "Tag Yellow", "Pop Purple", 
+        "Spotlight", "Outline Classic", "Exotic", "Golden", "Simple", 
+        "Pop Single", "Energy", "Bold", "Elegant", "Neon Pink"
+    ]
+    selected_caption_style = st.selectbox("Select Caption Preset", caption_style_options, index=0, label_visibility="collapsed")
+
+    # Active backup Subtitle Setting for robust rendering compatibility
+    with st.expander("Advanced Subtitle Settings (Active Backend)"):
+        enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
+        s_col1, s_col2 = st.columns(2)
+        with s_col1:
+            font_choice = st.selectbox("Font", ["Montserrat Black", "Impact Pro", "Arial Black", "Ubuntu Bold"], index=0)
+        with s_col2:
+            caption_align = st.selectbox("Position", ["Bottom (Safe Zone)", "Middle-Center", "Top (Safe Zone)"], index=0)
+
+        s_col3, s_col4 = st.columns(2)
+        with s_col3:
+            font_size = st.slider("Font Size", 18, 40, 24)
+        with s_col4:
+            words_per_line = st.slider("Words Per Line", 1, 5, 2)
+
+    st.markdown("---")
+
+    # --- 3. PROCESSING SETUP / MODE ---
+    st.markdown("### ⚙️ Processing Mode")
+    clip_mode = st.radio("Processing Mode Selection:", ("Manual Timestamps (Precise)", "Auto-Split AI (Smart Clips)"), label_visibility="collapsed")
+    
+    clip_ranges = []
+    if clip_mode == "Manual Timestamps (Precise)":
+        num_clips = st.number_input("Short Clips Quantity", min_value=1, max_value=5, value=1)
+        for i in range(int(num_clips)):
+            c1, c2 = st.columns(2)
+            with c1:
+                s_start = st.text_input(f"Clip {i+1} Start (s)", value=str(i*30), key=f"start_{i}")
+            with c2:
+                s_dur = st.text_input(f"Clip {i+1} Duration", value="28", key=f"dur_{i}")
+            clip_ranges.append((s_start, s_dur))
+    else:
+        target_clip_len = st.slider("Target Duration (Sec)", min_value=15, max_value=45, value=30)
+        st.info("AI will automatically split video into smart clips.")
+
+    st.markdown("---")
+
+    # --- 4. VIDEO & AUDIO SETTINGS ---
+    with st.expander("🎥 Video Filters & 🎵 Audio Settings"):
+        filter_category = st.selectbox("Filter Category", [
+            "High Quality & Aesthetic Filters (For Face & Body)",
+            "🎬 Cinematic & Vibe Filters (For Travel & Vlogs)",
+            "🤖 Viral AI & Special Effects Filters"
+        ], index=0, key=f"fc_{st.session_state.reset_trigger}")
+
+        if filter_category == "High Quality & Aesthetic Filters (For Face & Body)":
+            specific_filter_options = ["None", "iPhone HD", "HD Glamour Filter", "Flash CCD", "Universal Sunset", "Bold Glamour", "Bubblegum"]
+        elif filter_category == "🎬 Cinematic & Vibe Filters (For Travel & Vlogs)":
+            specific_filter_options = ["None", "Cinematic Glow / HD", "Green Lake", "Renoir / Reno", "Moon Rise", "Bad Bunny", "Cool Vibes"]
+        else:
+            specific_filter_options = ["None", "Cartoon Filter AI", "Barbie Girl AI / Princess", "Kid Teen Now Aged", "Falling Filter", "2016 Filter", "Velocity x Color AD", "Thermal Effect", "Dreamy Halo"]
+
+        f_col1, f_col2 = st.columns(2)
+        with f_col1:
+            specific_filter = st.selectbox("Select Filter", specific_filter_options, index=0, key=f"sf_{st.session_state.reset_trigger}")
+        with f_col2:
+            style_effect = st.selectbox("Style and Effects", ["None", "AI Autofill", "Velocity (Auto Velocity)", "3D Zoom Pro", "Camera Shake", "VHS Glitch Overlay"], index=0, key=f"se_{st.session_state.reset_trigger}")
+
+        enable_flip = st.checkbox("🔄 Horizontal Flip", value=False, key=f"flp_{st.session_state.reset_trigger}")
+        
+        enable_bg_music = st.checkbox("Add Background Music Track?", value=False)
+        if enable_bg_music:
+            uploaded_music = st.file_uploader("Upload Background MP3 Audio File", type=["mp3", "wav"])
+            if uploaded_music is not None:
+                with open(bg_music_path, "wb") as f:
+                    f.write(uploaded_music.getbuffer())
+                st.success("Background Music Loaded!")
+
+        enable_face_tracking = st.checkbox("Enable Smart AI Face Tracking", value=True)
+
+    render_clicked = st.button("🚀 Render Shorts Batch Now", type="primary", use_container_width=True)
 
 with col_left:
     if not os.path.exists(video_path):
         st.markdown("### 📥 Media Input")
-        uploaded_file = st.file_uploader("Drag and drop video here to upload (MP4, MOV, WEBM)", type=["mp4", "mov", "webm"])
+        uploaded_file = st.file_uploader("Drag and drop video here to upload", type=["mp4", "mov", "webm"])
         if uploaded_file is not None:
             if os.path.exists(preview_path):
                 os.remove(preview_path)
@@ -131,9 +229,9 @@ with col_left:
     else:
         st.markdown("### 🎬 Loaded Video Preview")
         
-        # Generate dynamic preview based on selected output format dimensions
+        # Generate responsive preview frame matching selected output format dynamically
         target_time = "0"
-        vf_preview_parts = [crop_filter, f"scale={scale_w//3}:{scale_h//3}"] # Scaled down for fast UI preview
+        vf_preview_parts = [crop_filter, f"scale={scale_w//4}:{scale_h//4}"]
         vf_preview_str = ",".join(vf_preview_parts)
         
         subprocess.run(
@@ -142,7 +240,7 @@ with col_left:
         )
         
         if os.path.exists(preview_path):
-            st.image(preview_path, use_container_width=True, caption=f"Live Preview Format: {output_format}")
+            st.image(preview_path, width=preview_width, caption=f"Format: {output_format}")
             
         if st.button("❌ Remove / Change Video", use_container_width=True):
             os.remove(video_path)
@@ -150,94 +248,10 @@ with col_left:
                 os.remove(preview_path)
             st.rerun()
 
-with col_right:
-    # --- CLIP DURATION / PROCESSING SETUP ---
-    st.markdown("### ⚙️ Clip Duration & Mode")
-    if os.path.exists(video_path):
-        clip_mode = st.radio("Processing Mode:", ("Manual Timestamps (Precise)", "Auto-Split AI (Smart Clips)"))
-        
-        clip_ranges = []
-        if clip_mode == "Manual Timestamps (Precise)":
-            num_clips = st.number_input("Short Clips Quantity", min_value=1, max_value=5, value=1)
-            for i in range(int(num_clips)):
-                c1, c2 = st.columns(2)
-                with c1:
-                    s_start = st.text_input(f"Clip {i+1} Start (s)", value=str(i*30), key=f"start_{i}")
-                with c2:
-                    s_dur = st.text_input(f"Clip {i+1} Duration", value="28", key=f"dur_{i}")
-                clip_ranges.append((s_start, s_dur))
-        else:
-            target_clip_len = st.slider("Target Duration (Sec)", min_value=15, max_value=45, value=30)
-            st.info("AI will automatically split video into smart clips.")
-
-    st.markdown("---")
-
-    # --- CAPTION STYLE ---
-    st.markdown("### 🎨 Caption Style")
-    caption_style_options = [
-        "None", "Subtle Gray", "Shadow Mint", "Subtle Cyan", "Stamp Red", 
-        "Retro Gold", "Block Dark", "Racing", "Modern Dark", "Modern Boxed", 
-        "Chunky", "Clean", "Shadow Lime", "Tag Yellow", "Pop Purple", 
-        "Spotlight", "Outline Classic", "Exotic", "Golden", "Simple", 
-        "Pop Single", "Energy", "Bold", "Elegant", "Neon Pink"
-    ]
-    selected_caption_style = st.selectbox("Select Caption Preset", caption_style_options, index=0)
-
-    with st.expander("Advanced Subtitle Settings (Active Backend)"):
-        enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
-        s_col1, s_col2 = st.columns(2)
-        with s_col1:
-            font_choice = st.selectbox("Font", ["Montserrat Black", "Impact Pro", "Arial Black", "Ubuntu Bold"], index=0)
-        with s_col2:
-            caption_align = st.selectbox("Position", ["Bottom (Safe Zone)", "Middle-Center", "Top (Safe Zone)"], index=0)
-
-        s_col3, s_col4 = st.columns(2)
-        with s_col3:
-            font_size = st.slider("Font Size", 18, 40, 24)
-        with s_col4:
-            words_per_line = st.slider("Words Per Line", 1, 5, 2)
-
-    st.markdown("---")
-
-    # --- VIDEO & AUDIO SETTING ---
-    with st.expander("🎥 Video Filters & 🎵 Audio Settings"):
-        filter_category = st.selectbox("Filter Category", [
-            "High Quality & Aesthetic Filters (For Face & Body)",
-            "🎬 Cinematic & Vibe Filters (For Travel & Vlogs)",
-            "🤖 Viral AI & Special Effects Filters"
-        ], index=0, key=f"fc_{st.session_state.reset_trigger}")
-
-        if filter_category == "High Quality & Aesthetic Filters (For Face & Body)":
-            specific_filter_options = ["None", "iPhone HD", "HD Glamour Filter", "Flash CCD", "Universal Sunset", "Bold Glamour", "Bubblegum"]
-        elif filter_category == "🎬 Cinematic & Vibe Filters (For Travel & Vlogs)":
-            specific_filter_options = ["None", "Cinematic Glow / HD", "Green Lake", "Renoir / Reno", "Moon Rise", "Bad Bunny", "Cool Vibes"]
-        else:
-            specific_filter_options = ["None", "Cartoon Filter AI", "Barbie Girl AI / Princess", "Kid Teen Now Aged", "Falling Filter", "2016 Filter", "Velocity x Color AD", "Thermal Effect", "Dreamy Halo"]
-
-        f_col1, f_col2 = st.columns(2)
-        with f_col1:
-            specific_filter = st.selectbox("Select Filter", specific_filter_options, index=0, key=f"sf_{st.session_state.reset_trigger}")
-        with f_col2:
-            style_effect = st.selectbox("Style and Effects", ["None", "AI Autofill", "Velocity (Auto Velocity)", "3D Zoom Pro", "Camera Shake", "VHS Glitch Overlay"], index=0, key=f"se_{st.session_state.reset_trigger}")
-
-        enable_flip = st.checkbox("🔄 Horizontal Flip", value=False, key=f"flp_{st.session_state.reset_trigger}")
-        
-        enable_bg_music = st.checkbox("Add Background Music Track?", value=False)
-        if enable_bg_music:
-            uploaded_music = st.file_uploader("Upload Background MP3 Audio File", type=["mp3", "wav"])
-            if uploaded_music is not None:
-                with open(bg_music_path, "wb") as f:
-                    f.write(uploaded_music.getbuffer())
-                st.success("Background Music Loaded!")
-
-        enable_face_tracking = st.checkbox("Enable Smart AI Face Tracking", value=True)
-
-    render_clicked = st.button("🚀 Render Shorts Batch Now", type="primary", use_container_width=True)
-
 # --- RENDERING & EXPORT GALLERY ---
 if os.path.exists(video_path) and render_clicked:
     tasks = []
-    if 'clip_mode' in locals() and clip_mode == "Manual Timestamps (Precise)" and 'clip_ranges' in locals():
+    if clip_mode == "Manual Timestamps (Precise)" and 'clip_ranges' in locals():
         for idx, (s_st, s_du) in enumerate(clip_ranges):
             try:
                 t_start, t_dur = int(s_st), int(s_du)
