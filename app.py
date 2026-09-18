@@ -20,7 +20,6 @@ if 'frame_time' not in st.session_state:
 if 'reset_trigger' not in st.session_state:
     st.session_state.reset_trigger = 0
 
-# Safe downloads folder ensure karna taake save hone mein koi error na aaye
 DOWNLOAD_DIR = "downloads"
 if not os.path.exists(DOWNLOAD_DIR):
     os.makedirs(DOWNLOAD_DIR, exist_ok=True)
@@ -65,9 +64,10 @@ with st.sidebar:
                 if os.path.exists(preview_path):
                     os.remove(preview_path)
                 
-                # Safe downloads directory path ke sath yt-dlp command
+                # Updated command with remote-components ejs support & client bypass
                 dl_cmd = (
                     f'yt-dlp --no-check-certificates --geo-bypass --remote-components ejs:npm '
+                    f'--extractor-args "youtube:player_client=android,web" '
                     f'-f "b[ext=mp4]/best[ext=mp4]/best" '
                     f'-o "{video_path}" "{video_url}"'
                 )
@@ -77,7 +77,7 @@ with st.sidebar:
                 if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
                     st.success("Video Successfully Downloaded & Saved!")
                 else:
-                    fallback_cmd = f'yt-dlp --no-check-certificates --remote-components ejs:npm -o "{video_path}" "{video_url}"'
+                    fallback_cmd = f'yt-dlp --no-check-certificates --remote-components ejs:npm --extractor-args "youtube:player_client=ios" -o "{video_path}" "{video_url}"'
                     subprocess.run(fallback_cmd, shell=True)
                     
                     if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
