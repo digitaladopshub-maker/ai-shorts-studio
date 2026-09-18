@@ -153,32 +153,50 @@ with col_right:
 
         if filter_category == "High Quality & Aesthetic Filters (For Face & Body)":
             specific_filter_options = ["None", "iPhone HD", "HD Glamour Filter", "Flash CCD", "Universal Sunset", "Bold Glamour", "Bubblegum"]
-        elif filter_category == "🎬 Cinematic & Vibe Filters (For Travel & Vlogs)":
-            specific_filter_options = ["None", "Cinematic Glow / HD", "Green Lake", "Renoir / Reno", "Moon Rise", "Bad Bunny", "Cool Vibes"]
-        else:
-            specific_filter_options = ["None", "Cartoon Filter AI", "Barbie Girl AI / Princess", "Kid Teen Now Aged", "Falling Filter", "2016 Filter", "Velocity x Color AD", "Thermal Effect", "Dreamy Halo"]
-
-        f_col1, f_col2 = st.columns(2)
-        with f_col1:
-            specific_filter = st.selectbox("Select Filter", specific_filter_options, index=0, key=f"sf_{st.session_state.reset_trigger}")
-        with f_col2:
-            style_effect = st.selectbox("Style and Effects", ["None", "AI Autofill", "Velocity (Auto Velocity)", "3D Zoom Pro", "Camera Shake", "VHS Glitch Overlay"], index=0, key=f"se_{st.session_state.reset_trigger}")
-
-        v_col1, v_col2 = st.columns(2)
-        with v_col1:
-            enable_flip = st.checkbox("🔄 Horizontal Flip", value=False, key=f"flp_{st.session_state.reset_trigger}")
-        with v_col2:
-            video_speed = st.selectbox("Video Speed", ["1.0x (Normal)", "1.1x (Fast Viral)", "1.25x (Super Fast)"], index=0, key=f"spd_{st.session_state.reset_trigger}")
-            speed_val = 1.0 if "1.0x" in video_speed else (1.1 if "1.1x" in video_speed else 1.25)
-
-        if st.button("🔄 Reset Video Filters & Effects"):
-            st.session_state.reset_trigger += 1
-            st.rerun()
-
-        enable_bg_music = st.checkbox("Add Background Music Track?", value=False)
-        bg_music_file = None
-        if enable_bg_music:
-            uploaded_music = st.file_uploader("Upload Background MP3 Audio File", type=["mp3", "wav"])
+                if option == "Paste URL (YouTube / FB / Insta)":
+            video_url = st.text_input("Video URL Paste Karein:")
+            if video_url and st.button("Fetch & Download Video"):
+                with st.spinner("Downloading Video via Bypass Client (Please wait)..."):
+                    if os.path.exists(video_path):
+                        os.remove(video_path)
+                    if os.path.exists(preview_path):
+                        os.remove(preview_path)
+                    
+                    import yt_dlp
+                    
+                    # Foolproof options jo Streamlit server par 403 / SABR block ko bypass karengi
+                    ydl_opts = {
+                        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                        'outtmpl': video_path.replace('.mp4', ''),
+                        'merge_output_format': 'mp4',
+                        'noplaylist': True,
+                        'quiet': True,
+                        'extractor_args': {
+                            'youtube': {
+                                'clients': ['ios', 'tv'],  # Safe clients jinpar cloud server block nahi hota
+                                'formats': ['missing_pot', 'missing_sabr']
+                            }
+                        },
+                        'http_headers': {
+                            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1',
+                        }
+                    }
+                    
+                    try:
+                        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                            ydl.download([video_url])
+                        
+                        # Check extension handling
+                        if not os.path.exists(video_path) and os.path.exists(video_path + ".mp4"):
+                            os.rename(video_path + ".mp4", video_path)
+                            
+                        if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
+                            st.success("✅ Video Successfully Downloaded via iOS Client!")
+                            st.rerun()
+                        else:
+                            st.error("Download completed but file is missing or empty.")
+                    except Exception as e:
+                        st.error(f"Download failed! Detailed Error: {str(e)}")
             if uploaded_music is not None:
                 with open(bg_music_path, "wb") as f:
                     f.write(uploaded_music.getbuffer())
