@@ -10,13 +10,6 @@ from fonts import get_pro_font, get_font_family
 from effects_engine import get_filter_ffmpeg_string, get_style_effect_ffmpeg_string
 from subtitle_engine import get_subtitle_styling
 
-# --- AUTOMATIC NODE.JS ALIAS FIX FOR LINUX SERVERS (YT-DLP EJS) ---
-if not shutil.which("node") and shutil.which("nodejs"):
-    try:
-        os.system("ln -sf /usr/bin/nodejs /usr/bin/node")
-    except:
-        pass
-
 st.set_page_config(page_title="AI Clipping Studio", layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown("""
@@ -245,42 +238,35 @@ with col_left:
         option = st.radio("Input Method:", ("Upload MP4 File", "Paste URL (YouTube / FB / Insta)"))
 
         if option == "Paste URL (YouTube / FB / Insta)":
-            with st.form("url_form"):
-                video_url = st.text_input("Video URL Paste Karein:")
-                fetch_submitted = st.form_submit_button("Fetch & Download Video", type="primary")
-
-            if fetch_submitted and video_url:
-                with st.spinner("Fetching & Downloading Video (Using iOS Client Bypass)..."):
+            video_url = st.text_input("Video URL Paste Karein:")
+            if video_url and st.button("Fetch & Download Video"):
+                with st.spinner("Downloading Video (Please wait)..."):
                     if os.path.exists(video_path):
                         os.remove(video_path)
                     
-                    # Using iOS client extractor args to completely bypass n-challenge and page reload errors
                     dl_cmd = (
-                        f'yt-dlp --no-check-certificates --geo-bypass '
-                        f'--extractor-args "youtube:player_client=ios" '
-                        f'-f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" '
+                        f'yt-dlp --no-check-certificates --geo-bypass --remote-components ejs:npm '
+                        f'--extractor-args "youtube:player_client=web,mweb" '
+                        f'-f "bestvideo[ext=mp4]+bestaudio[ext=mp4]/best[ext=mp4]/best" '
                         f'-o "{video_path}" "{video_url}"'
                     )
                     result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
                     
                     if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-                        st.success("Video Successfully Fetched & Saved!")
+                        st.success("Video Successfully Downloaded & Saved!")
                         st.rerun()
                     else:
-                        fallback_cmd = (
-                            f'yt-dlp --no-check-certificates --geo-bypass '
-                            f'--extractor-args "youtube:player_client=mweb" '
-                            f'-f "b[ext=mp4]/best" '
-                            f'-o "{video_path}" "{video_url}"'
-                        )
+                        fallback_cmd = f'yt-dlp --no-check-certificates --remote-components ejs:npm --extractor-args "youtube:player_client=ios" -o "{video_path}" "{video_url}"'
                         subprocess.run(fallback_cmd, shell=True)
                         if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-                            st.success("Video Fetched via Fallback & Saved!")
+                            st.success("Video Downloaded via Fallback & Saved!")
                             st.rerun()
                         else:
-                            st.error("Fetch failed! Detailed Error:")
+                            st.error("Download failed! Detailed Error:")
                             if result.stderr:
                                 st.code(result.stderr[:400])
+                            else:
+                                st.error("Unknown error occurred during download.")
 
         elif option == "Upload MP4 File":
             uploaded_file = st.file_uploader("Upload MP4 File", type=["mp4"])
@@ -295,6 +281,7 @@ with col_left:
         target_time = "0"
         vf_preview_parts = []
         
+        # Determine X coordinate
         if st.session_state.enable_face_tracking:
             f_x = detect_face_center(video_path, target_time)
             if f_x:
@@ -304,11 +291,12 @@ with col_left:
         else:
             f_x_expr = f"in_w * {st.session_state.manual_offset_x / 100.0}"
 
+        # To allow vertical movement, let's make crop height slightly flexible or proportional
         f_y_expr = f"in_h * {st.session_state.manual_offset_y / 100.0}"
 
         if "9:16" in output_format:
             crop_w = f"ih*{scale_w}/{scale_h}"
-            crop_h = "ih * 0.85"
+            crop_h = "ih*0.95"  # Slightly less than ih to allow vertical up/down movement room
             crop_x = f"clip({f_x_expr}-{crop_w}/2\\, 0\\, in_w-{crop_w})"
             crop_y = f"clip({f_y_expr}-{crop_h}/2\\, 0\\, in_h-{crop_h})"
             vf_preview_parts = [f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}"]
@@ -419,7 +407,7 @@ if os.path.exists(video_path) and render_clicked:
 
             if "9:16" in output_format:
                 crop_w = f"ih*{scale_w}/{scale_h}"
-                crop_h = "ih * 0.85"
+                crop_h = "ih*0.95"
                 crop_x = f"clip({f_x_expr}-{crop_w}/2\\, 0\\, in_w-{crop_w})"
                 crop_y = f"clip({f_y_expr}-{crop_h}/2\\, 0\\, in_h-{crop_h})"
                 render_vf_parts = [f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}"]
