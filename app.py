@@ -222,11 +222,6 @@ with col_right:
                 bg_vol_pct = st.slider("Background Music Volume (%)", min_value=0, max_value=100, value=15, step=1)
                 bg_vol = bg_vol_pct / 100.0
 
-        enable_face_tracking = st.checkbox("Enable Smart AI Face Tracking", value=True)
-        
-        # MANUAL FRAMING OFFSET SLIDER
-        manual_offset = st.slider("Manual Framing Offset (Left/Right)", min_value=0, max_value=100, value=35, help="0 = Left edge, 50 = Center, 100 = Right edge")
-
     render_clicked = st.button("🚀 Render Shorts Batch Now", type="primary", use_container_width=True)
 
 with col_left:
@@ -279,13 +274,16 @@ with col_left:
     else:
         st.markdown("### 🎬 Loaded Video Preview")
         
+        # --- FACE TRACKING & MANUAL FRAMING CONTROLS MOVED UNDER PREVIEW ---
+        enable_face_tracking = st.checkbox("Enable Smart AI Face Tracking", value=True)
+        manual_offset = st.slider("Manual Framing Offset (Left/Right)", min_value=0, max_value=100, value=35, help="0 = Left edge, 50 = Center, 100 = Right edge")
+        
         target_time = "0"
         vf_preview_parts = []
         
         if enable_face_tracking:
             f_x = detect_face_center(video_path, target_time)
             if not f_x:
-                # Live Preview mein ab manual slider ki value apply hogi agar face detect na ho
                 f_x_expr = f"in_w * {manual_offset / 100.0}"
             else:
                 f_x_expr = str(f_x)
