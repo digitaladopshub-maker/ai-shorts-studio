@@ -164,7 +164,7 @@ with col_right:
             with c1:
                 s_start = st.text_input(f"Clip {i+1} Start (s)", value=str(i*30), key=f"start_{i}")
             with c2:
-                s_dur = st.text_input(f"Clip {i+1} Duration", value="28", key=f"dur_{i}")
+                s_dur = st.text_input(f"Clip {i+1} Duration", value="8", key=f"dur_{i}")
             clip_ranges.append((s_start, s_dur))
     else:
         target_clip_len = st.slider("Target Duration (Sec)", min_value=15, max_value=45, value=30)
@@ -269,10 +269,9 @@ with col_left:
         vf_preview_parts = [crop_filter]
         if enable_face_tracking:
             f_x = detect_face_center(video_path, target_time)
-            # Smart Fallback: Agar face detect na ho, toh exact center ki bajaye thoda left shift karein taake face cut na ho
             if not f_x:
-                f_x = "in_w * 0.35" if "9:16" in output_format else "in_w / 2"
-                crop_filter_str = f"crop=ih*{scale_w}/{scale_h}:ih:clamp({f_x}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"
+                f_x_expr = "in_w * 0.35" if "9:16" in output_format else "in_w / 2"
+                crop_filter_str = f"crop=ih*{scale_w}/{scale_h}:ih:clamp({f_x_expr}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"
             else:
                 crop_filter_str = f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"
             vf_preview_parts = [crop_filter_str]
@@ -342,10 +341,10 @@ if os.path.exists(video_path) and render_clicked:
             try:
                 t_start, t_dur = int(s_st), int(s_du)
             except:
-                t_start, t_dur = idx * 30, 28
+                t_start, t_dur = idx * 30, 8
             tasks.append((idx + 1, t_start, t_dur))
     else:
-        tasks = [(1, 0, 30), (2, 35, 30), (3, 70, 30)]
+        tasks = [(1, 0, 8)]
 
     model = whisper.load_model("base") if enable_subs else None
     generated_clips = []
@@ -355,14 +354,14 @@ if os.path.exists(video_path) and render_clicked:
             cropped_file = os.path.join(DOWNLOAD_DIR, f"cropped_{clip_num}.mp4")
             final_file = os.path.join(DOWNLOAD_DIR, f"final_short_{clip_num}.mp4")
             
+            # FAST NON-BLOCKING CROP & FACE POSITIONING
             render_vf_parts = []
             if enable_face_tracking:
-                f_x = detect_face_center(video_path, start_sec)
-                if not f_x:
-                    f_x_expr = "in_w * 0.35" if "9:16" in output_format else "in_w / 2"
-                    render_crop = f"crop=ih*{scale_w}/{scale_h}:ih:clamp({f_x_expr}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"
+                # Agar face tracking on ho aur 9:16 vertical ho, toh safe smart offset use karein jo heavy cv2 scan na kare
+                if "9:16" in output_format:
+                    render_crop = f"crop=ih*{scale_w}/{scale_h}:ih:in_w*0.35:0"
                 else:
-                    render_crop = f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"
+                    render_crop = crop_filter
                 render_vf_parts.append(render_crop)
             else:
                 render_vf_parts.append(crop_filter)
