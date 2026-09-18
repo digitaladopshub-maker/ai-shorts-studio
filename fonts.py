@@ -2,10 +2,10 @@ import os
 from PIL import ImageFont
 
 def get_pro_font(font_choice, font_size):
+    # Check if custom uploaded font exists in the local 'fonts/' folder
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     FONT_DIR = os.path.join(BASE_DIR, "fonts")
     
-    # Check if custom uploaded font exists in the local 'fonts/' folder
     choice_lower = font_choice.lower()
     custom_font_file = None
     
@@ -34,7 +34,7 @@ def get_pro_font(font_choice, font_size):
             except Exception:
                 pass
 
-    # Fallback to original system font paths if local file is missing
+    # Fallback to original system font paths
     font_paths = [
         "/usr/share/fonts/truetype/msttcorefonts/Impact.ttf",
         "/usr/share/fonts/truetype/msttcorefonts/Arial_Black.ttf",
