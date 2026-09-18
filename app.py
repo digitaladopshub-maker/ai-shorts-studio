@@ -224,7 +224,7 @@ with col_right:
 
             ac1, ac2 = st.columns(2)
             with ac1:
-                orig_vol_pct = st.slider("Original Voice Volume (%)", min_value=0, max_value=200, value=100, step=5)
+                orig_vol_pct = st.slider("Original Voice Volume (%)", min_value=0, max_value=200, value=100, step5)
                 orig_vol = orig_vol_pct / 100.0
             with ac2:
                 bg_vol_pct = st.slider("Background Music Volume (%)", min_value=0, max_value=100, value=15, step=1)
@@ -238,7 +238,6 @@ with col_left:
         option = st.radio("Input Method:", ("Upload MP4 File", "Paste URL (YouTube / FB / Insta)"))
 
         if option == "Paste URL (YouTube / FB / Insta)":
-            # URL input with form so user can just press Enter once to start downloading directly
             with st.form("url_form"):
                 video_url = st.text_input("Video URL Paste Karein:")
                 fetch_submitted = st.form_submit_button("Fetch & Download Video", type="primary")
@@ -248,11 +247,10 @@ with col_left:
                     if os.path.exists(video_path):
                         os.remove(video_path)
                     
-                    # Updated yt-dlp arguments to handle n-challenge and player client issues smoothly
+                    # Updated command using --impersonate chrome to bypass SABR/403 errors
                     dl_cmd = (
                         f'yt-dlp --no-check-certificates --geo-bypass '
-                        f'--extractor-args "youtube:player_client=android,web" '
-                        f'-f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" '
+                        f'--impersonate chrome '
                         f'-o "{video_path}" "{video_url}"'
                     )
                     result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
@@ -263,7 +261,7 @@ with col_left:
                     else:
                         fallback_cmd = (
                             f'yt-dlp --no-check-certificates --geo-bypass '
-                            f'--extractor-args "youtube:player_client=ios" '
+                            f'--extractor-args "youtube:player_client=android" '
                             f'-o "{video_path}" "{video_url}"'
                         )
                         subprocess.run(fallback_cmd, shell=True)
