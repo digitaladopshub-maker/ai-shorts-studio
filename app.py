@@ -27,10 +27,13 @@ if 'reset_trigger' not in st.session_state:
     st.session_state.reset_trigger = 0
 
 if 'enable_face_tracking' not in st.session_state:
-    st.session_state.enable_face_tracking = True
+    st.session_state.enable_face_tracking = False
 
-if 'manual_offset' not in st.session_state:
-    st.session_state.manual_offset = 35
+if 'manual_offset_x' not in st.session_state:
+    st.session_state.manual_offset_x = 35
+
+if 'manual_offset_y' not in st.session_state:
+    st.session_state.manual_offset_y = 50
 
 DOWNLOAD_DIR = "downloads"
 if not os.path.exists(DOWNLOAD_DIR):
@@ -51,7 +54,6 @@ if os.path.exists(LOCAL_FONT_DIR):
                 shutil.copy(src_p, dst_p)
 
 video_path = os.path.join(DOWNLOAD_DIR, "input_video.mp4")
-preview_path = os.path.join(DOWNLOAD_DIR, "preview_frame.jpg")
 bg_music_path = os.path.join(DOWNLOAD_DIR, "bg_music.mp3")
 
 def detect_face_center(v_path, start_sec):
@@ -241,8 +243,6 @@ with col_left:
                 with st.spinner("Downloading Video (Please wait)..."):
                     if os.path.exists(video_path):
                         os.remove(video_path)
-                    if os.path.exists(preview_path):
-                        os.remove(preview_path)
                     
                     dl_cmd = (
                         f'yt-dlp --no-check-certificates --geo-bypass --remote-components ejs:npm '
@@ -271,8 +271,6 @@ with col_left:
         elif option == "Upload MP4 File":
             uploaded_file = st.file_uploader("Upload MP4 File", type=["mp4"])
             if uploaded_file is not None:
-                if os.path.exists(preview_path):
-                    os.remove(preview_path)
                 with open(video_path, "wb") as f:
                     f.write(uploaded_file.getbuffer())
                 st.success("File Uploaded & Saved!")
@@ -280,21 +278,30 @@ with col_left:
     else:
         st.markdown("### 🎬 Loaded Video Preview")
         
+        # --- CONTROLS PLACED BELOW HEADER & ABOVE PREVIEW ---
+        st.checkbox("Enable Smart AI Face Tracking", key="enable_face_tracking")
+        st.slider("Manual Framing Offset (Left/Right)", min_value=0, max_value=100, key="manual_offset_x", help="0 = Left edge, 50 = Center, 100 = Right edge")
+        st.slider("Manual Framing Offset (Up/Down)", min_value=0, max_value=100, key="manual_offset_y", help="0 = Top edge, 50 = Center, 100 = Bottom edge")
+        
         target_time = "0"
         vf_preview_parts = []
         
-        # Determine crop coordinate based on face tracking or manual offset slider
+        # Determine X coordinate
         if st.session_state.enable_face_tracking:
             f_x = detect_face_center(video_path, target_time)
             if f_x:
                 f_x_expr = str(f_x)
             else:
-                f_x_expr = f"in_w * {st.session_state.manual_offset / 100.0}"
+                f_x_expr = f"in_w * {st.session_state.manual_offset_x / 100.0}"
         else:
-            f_x_expr = f"in_w * {st.session_state.manual_offset / 100.0}"
+            f_x_expr = f"in_w * {st.session_state.manual_offset_x / 100.0}"
+
+        # Determine Y coordinate (Up/Down)
+        f_y_expr = f"in_h * {st.session_state.manual_offset_y / 100.0}"
 
         if "9:16" in output_format:
-            vf_preview_parts = [f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x_expr}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"]
+            # Crop filter with X and Y custom offsets
+            vf_preview_parts = [f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x_expr}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):clamp(y={f_y_expr}-ih/2\\,0\\,in_h-ih)"]
         else:
             vf_preview_parts = [crop_filter]
 
@@ -312,13 +319,16 @@ with col_left:
         vf_preview_parts.append(f"scale={preview_scale_w}:{preview_scale_h}")
         vf_preview_str = ",".join(vf_preview_parts)
 
+        # Unique preview filename to avoid caching issues in Streamlit
+        dynamic_preview_path = os.path.join(DOWNLOAD_DIR, f"preview_frame_{st.session_state.manual_offset_x}_{st.session_state.manual_offset_y}.jpg")
+
         subprocess.run(
-            f'ffmpeg -y -ss {target_time} -i "{video_path}" -vframes 1 -vf "{vf_preview_str}" "{preview_path}"', 
+            f'ffmpeg -y -ss {target_time} -i "{video_path}" -vframes 1 -vf "{vf_preview_str}" "{dynamic_preview_path}"', 
             shell=True, capture_output=True
         )
         
-        if os.path.exists(preview_path):
-            img = Image.open(preview_path)
+        if os.path.exists(dynamic_preview_path):
+            img = Image.open(dynamic_preview_path)
             draw = ImageDraw.Draw(img)
             
             if enable_subs:
@@ -349,14 +359,10 @@ with col_left:
                 
             st.image(img, width=preview_scale_w, caption=f"Live Preview | Format: {output_format}")
             
-        # --- CONTROLS PLACED BELOW PREVIEW PHOTO & ABOVE REMOVE BUTTON ---
-        st.checkbox("Enable Smart AI Face Tracking", key="enable_face_tracking")
-        st.slider("Manual Framing Offset (Left/Right)", min_value=0, max_value=100, key="manual_offset", help="0 = Left edge, 50 = Center, 100 = Right edge")
-            
         if st.button("❌ Remove / Change Video", use_container_width=True):
             os.remove(video_path)
-            if os.path.exists(preview_path):
-                os.remove(preview_path)
+            if os.path.exists(dynamic_preview_path):
+                os.remove(dynamic_preview_path)
             st.rerun()
 
 # --- RENDERING & EXPORT GALLERY ---
@@ -386,12 +392,14 @@ if os.path.exists(video_path) and render_clicked:
                 if f_x:
                     f_x_expr = str(f_x)
                 else:
-                    f_x_expr = f"in_w * {st.session_state.manual_offset / 100.0}"
+                    f_x_expr = f"in_w * {st.session_state.manual_offset_x / 100.0}"
             else:
-                f_x_expr = f"in_w * {st.session_state.manual_offset / 100.0}"
+                f_x_expr = f"in_w * {st.session_state.manual_offset_x / 100.0}"
+
+            f_y_expr = f"in_h * {st.session_state.manual_offset_y / 100.0}"
 
             if "9:16" in output_format:
-                render_vf_parts = [f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x_expr}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"]
+                render_vf_parts = [f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x_expr}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):clamp(y={f_y_expr}-ih/2\\,0\\,in_h-ih)"]
             else:
                 render_vf_parts = [crop_filter]
 
