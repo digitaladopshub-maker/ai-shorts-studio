@@ -2,6 +2,7 @@ import streamlit as st
 import whisper
 import subprocess
 import os
+import shutil
 import textwrap
 import cv2
 from PIL import Image, ImageDraw
@@ -28,6 +29,20 @@ if 'reset_trigger' not in st.session_state:
 DOWNLOAD_DIR = "downloads"
 if not os.path.exists(DOWNLOAD_DIR):
     os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+# --- AUTO REGISTER FONTS TO SYSTEM FOR FFMPEG/LIBASS ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOCAL_FONT_DIR = os.path.join(BASE_DIR, "fonts")
+USER_FONT_DIR = os.path.expanduser("~/.local/share/fonts")
+os.makedirs(USER_FONT_DIR, exist_ok=True)
+
+if os.path.exists(LOCAL_FONT_DIR):
+    for f_name in os.listdir(LOCAL_FONT_DIR):
+        if f_name.endswith(".ttf"):
+            src_p = os.path.join(LOCAL_FONT_DIR, f_name)
+            dst_p = os.path.join(USER_FONT_DIR, f_name)
+            if not os.path.exists(dst_p):
+                shutil.copy(src_p, dst_p)
 
 video_path = os.path.join(DOWNLOAD_DIR, "input_video.mp4")
 preview_path = os.path.join(DOWNLOAD_DIR, "preview_frame.jpg")
@@ -425,7 +440,6 @@ if os.path.exists(video_path) and render_clicked:
                                 wrapped_chunk = textwrap.wrap(raw_str, width=render_wrap_width)
                                 text_str = "\\N".join(wrapped_chunk)
                                 
-                                # SAFE TIME FORMATTING TO PREVENT NAMEERROR
                                 s_tot_m, s_s = divmod(start_t, 60)
                                 s_h, s_m = divmod(s_tot_m, 60)
                                 
@@ -440,9 +454,10 @@ if os.path.exists(video_path) and render_clicked:
                 base_dir = os.path.dirname(os.path.abspath(__file__))
                 fonts_dir = os.path.join(base_dir, "fonts")
                 
+                # CORRECT SYNTAX FOR FFMPEG ASS FILTER WITH FONTDIR
                 sub_cmd = (
-                    f'ffmpeg -y -fontsdir "{fonts_dir}" -i "{cropped_file}" '
-                    f'-vf "ass={ass_file}" '
+                    f'ffmpeg -y -i "{cropped_file}" '
+                    f'-vf "ass={ass_file}:fontsdir={fonts_dir}" '
                     f'-c:v libx264 -preset ultrafast -c:a aac "{final_file}"'
                 )
                 subprocess.run(sub_cmd, shell=True)
