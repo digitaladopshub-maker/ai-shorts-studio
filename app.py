@@ -64,10 +64,10 @@ with st.sidebar:
                 if os.path.exists(preview_path):
                     os.remove(preview_path)
                 
-                # UPDATED: TV aur Creator clients ko force kiya hai jo SABR restrictions se bahar hain.
+                # FINAL FIX: Force IPv4 protocol along with web_embedded configurations to bypass the 'Page needs to be reloaded' blocker.
                 dl_cmd = (
-                    f'yt-dlp --no-check-certificates --geo-bypass --remote-components ejs:npm '
-                    f'--extractor-args "youtube:player_client=tv,creator;skip=web,android,ios" '
+                    f'yt-dlp --force-ipv4 --no-check-certificates --geo-bypass --remote-components ejs:npm '
+                    f'--extractor-args "youtube:player_client=default,web_embedded" '
                     f'-f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" '
                     f'--merge-output-format mp4 '
                     f'-o "{video_path}" "{video_url}"'
@@ -78,10 +78,10 @@ with st.sidebar:
                 if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
                     st.success("Video Successfully Downloaded & Saved!")
                 else:
-                    # Fallback standard extraction strategy without custom clients
+                    # Fallback approach using standard extraction sequence on failure
                     fallback_cmd = (
-                        f'yt-dlp --no-check-certificates --remote-components ejs:npm '
-                        f'--extractor-args "youtube:player_client=tv" '
+                        f'yt-dlp --force-ipv4 --no-check-certificates '
+                        f'--extractor-args "youtube:player_client=web_embedded" '
                         f'-f "bestvideo+bestaudio/best" '
                         f'--merge-output-format mp4 '
                         f'-o "{video_path}" "{video_url}"'
