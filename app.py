@@ -240,14 +240,15 @@ with col_left:
         if option == "Paste URL (YouTube / FB / Insta)":
             video_url = st.text_input("Video URL Paste Karein:")
             if video_url and st.button("Fetch & Download Video"):
-                with st.spinner("Fetching & Downloading Video (Optimized Speed)..."):
+                with st.spinner("Fetching & Downloading Video (Bypassing YouTube restrictions)..."):
                     if os.path.exists(video_path):
                         os.remove(video_path)
                     
-                    # Optimized yt-dlp command for fast fetching and robust format selection
+                    # Robust and anti-bot yt-dlp command with player clients and remote components
                     dl_cmd = (
-                        f'yt-dlp --no-check-certificates --geo-bypass '
-                        f'-f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" '
+                        f'yt-dlp --no-check-certificates --geo-bypass --remote-components ejs:npm '
+                        f'--extractor-args "youtube:player_client=web,mweb" '
+                        f'-f "bestvideo[ext=mp4]+bestaudio[ext=mp4]/best[ext=mp4]/best" '
                         f'-o "{video_path}" "{video_url}"'
                     )
                     result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
@@ -256,16 +257,22 @@ with col_left:
                         st.success("Video Successfully Fetched & Saved!")
                         st.rerun()
                     else:
-                        # Fallback simple command if standard format fails
-                        fallback_cmd = f'yt-dlp --no-check-certificates -o "{video_path}" "{video_url}"'
+                        # Fallback iOS client command if web client fails
+                        fallback_cmd = (
+                            f'yt-dlp --no-check-certificates --geo-bypass '
+                            f'--extractor-args "youtube:player_client=ios" '
+                            f'-o "{video_path}" "{video_url}"'
+                        )
                         subprocess.run(fallback_cmd, shell=True)
                         if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
                             st.success("Video Fetched via Fallback & Saved!")
                             st.rerun()
                         else:
-                            st.error("Fetch failed! Please check the URL or try another link.")
+                            st.error("Fetch failed! Detailed Error:")
                             if result.stderr:
                                 st.code(result.stderr[:400])
+                            else:
+                                st.error("Unknown error occurred during download.")
 
         elif option == "Upload MP4 File":
             uploaded_file = st.file_uploader("Upload MP4 File", type=["mp4"])
