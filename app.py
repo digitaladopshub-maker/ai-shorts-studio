@@ -205,7 +205,244 @@ with col_left:
         if option == "Paste URL (YouTube / FB / Insta)":
             video_url = st.text_input("Video URL Paste Karein:")
             if video_url and st.button("Fetch & Download Video"):
-                with st.spinner("Downloading Video via Bypass Client (Please wait)..."):
+                with st.spinner("Downloading Video (Please wait)..."):
                     if os.path.exists(video_path):
                         os.remove(video_path)
                     if os.path.exists(preview_path):
+                        os.remove(preview_path)
+                    
+                    dl_cmd = (
+                        f'yt-dlp --no-check-certificates --geo-bypass --remote-components ejs:npm '
+                        f'--extractor-args "youtube:player_client=android,web" '
+                        f'-f "b[ext=mp4]/best[ext=mp4]/best" '
+                        f'-o "{video_path}" "{video_url}"'
+                    )
+                    result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
+                    
+                    if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
+                        st.success("Video Successfully Downloaded & Saved!")
+                        st.rerun()
+                    else:
+                        fallback_cmd = f'yt-dlp --no-check-certificates --remote-components ejs:npm --extractor-args "youtube:player_client=ios" -o "{video_path}" "{video_url}"'
+                        subprocess.run(fallback_cmd, shell=True)
+                        if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
+                            st.success("Video Downloaded via Fallback & Saved!")
+                            st.rerun()
+                        else:
+                            st.error("Download failed! Detailed Error:")
+                            if result.stderr:
+                                st.code(result.stderr[:400])
+                            else:
+                                st.error("Unknown error occurred during download.")
+
+        elif option == "Upload MP4 File":
+            uploaded_file = st.file_uploader("Upload MP4 File", type=["mp4"])
+            if uploaded_file is not None:
+                if os.path.exists(preview_path):
+                    os.remove(preview_path)
+                with open(video_path, "wb") as f:
+                    f.write(uploaded_file.getbuffer())
+                st.success("File Uploaded & Saved!")
+                st.rerun()
+    else:
+        st.markdown("### 🎬 Loaded Video Preview")
+        
+        target_time = "0"
+        vf_preview_parts = [crop_filter]
+        if enable_face_tracking:
+            f_x = detect_face_center(video_path, target_time)
+            if f_x and "9:16" in output_format:
+                vf_preview_parts = [f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"]
+
+        if enable_flip:
+            vf_preview_parts.append("hflip")
+        
+        f_str = get_filter_ffmpeg_string(filter_category, specific_filter)
+        if f_str:
+            vf_preview_parts.append(f_str)
+
+        e_str = get_style_effect_ffmpeg_string(style_effect)
+        if e_str:
+            vf_preview_parts.append(e_str)
+
+        vf_preview_parts.append(f"scale={preview_scale_w}:{preview_scale_h}")
+        vf_preview_str = ",".join(vf_preview_parts)
+
+        subprocess.run(
+            f'ffmpeg -y -ss {target_time} -i "{video_path}" -vframes 1 -vf "{vf_preview_str}" "{preview_path}"', 
+            shell=True, capture_output=True
+        )
+        
+        if os.path.exists(preview_path):
+            img = Image.open(preview_path)
+            draw = ImageDraw.Draw(img)
+            
+            if enable_subs:
+                text_color, outline_color, _, _, _ = get_subtitle_styling(style_preset)
+                w, h = img.size
+                sample_words = ["CLIPPING", "PREVIEW", "VIRAL", "STUDIO"]
+                raw_text = " ".join(sample_words[:words_per_line])
+                
+                if "Hormozi" in style_preset or "Pop" in style_preset:
+                    raw_text = "💥 " + raw_text
+
+                wrap_width = max(8, int(16 - (font_size / 3)))
+                wrapped_lines = textwrap.wrap(raw_text, width=wrap_width)
+                wrapped_text = "\n".join(wrapped_lines)
+
+                font = get_pro_font(font_choice, int(font_size * 0.9))
+
+                if "Top" in caption_align:
+                    y_pos = int(h * 0.18)
+                elif "Middle-Center" in caption_align:
+                    y_pos = int(h * 0.5)
+                else:
+                    y_pos = int(h - int(h * 0.22))
+
+                x_pos = int(w / 2)
+                draw.multiline_text(
+                    (x_pos, y_pos), wrapped_text, font=font, fill=text_color, 
+                    anchor="mm", align="center", stroke_width=3, stroke_fill=outline_color
+                )
+                
+            st.image(img, width=preview_scale_w, caption=f"Live Preview | Format: {output_format}")
+            
+        if st.button("❌ Remove / Change Video", use_container_width=True):
+            os.remove(video_path)
+            if os.path.exists(preview_path):
+                os.remove(preview_path)
+            st.rerun()
+
+# --- RENDERING & EXPORT GALLERY ---
+if os.path.exists(video_path) and render_clicked:
+    tasks = []
+    if clip_mode == "Manual Timestamps (Precise)" and 'clip_ranges' in locals():
+        for idx, (s_st, s_du) in enumerate(clip_ranges):
+            try:
+                t_start, t_dur = int(s_st), int(s_du)
+            except:
+                t_start, t_dur = idx * 30, 28
+            tasks.append((idx + 1, t_start, t_dur))
+    else:
+        tasks = [(1, 0, 30), (2, 35, 30), (3, 70, 30)]
+
+    model = whisper.load_model("base") if enable_subs else None
+    generated_clips = []
+
+    with st.spinner("Processing High-Quality Professional Shorts..."):
+        for clip_num, start_sec, duration_sec in tasks:
+            cropped_file = os.path.join(DOWNLOAD_DIR, f"cropped_{clip_num}.mp4")
+            final_file = os.path.join(DOWNLOAD_DIR, f"final_short_{clip_num}.mp4")
+            
+            render_vf_parts = [crop_filter]
+            if enable_face_tracking:
+                f_x = detect_face_center(video_path, start_sec)
+                if f_x and "9:16" in output_format:
+                    render_vf_parts = [f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"]
+
+            if enable_flip:
+                render_vf_parts.append("hflip")
+            
+            f_str = get_filter_ffmpeg_string(filter_category, specific_filter)
+            if f_str:
+                render_vf_parts.append(f_str)
+
+            e_str = get_style_effect_ffmpeg_string(style_effect)
+            if e_str:
+                render_vf_parts.append(e_str)
+
+            render_vf_parts.append(f"scale={scale_w}:{scale_h}")
+            
+            if speed_val != 1.0:
+                render_vf_parts.append(f"setpts=PTS/{speed_val}")
+
+            render_vf_str = ",".join(render_vf_parts)
+            audio_filter_str = f"atempo={speed_val}" if speed_val != 1.0 else "anull"
+
+            crop_cmd = (
+                f'ffmpeg -y -ss {start_sec} -i "{video_path}" -t {duration_sec} '
+                f'-vf "{render_vf_str}" -af "{audio_filter_str}" '
+                f'-c:v libx264 -preset ultrafast -crf 20 -c:a aac "{cropped_file}"'
+            )
+            subprocess.run(crop_cmd, shell=True)
+
+            mixed_audio_file = os.path.join(DOWNLOAD_DIR, f"mixed_{clip_num}.mp4")
+            if enable_bg_music and os.path.exists(bg_music_path):
+                mix_cmd = (
+                    f'ffmpeg -y -i "{cropped_file}" -stream_loop -1 -i "{bg_music_path}" '
+                    f'-filter_complex "[0:a]volume={orig_vol}[a1];[1:a]volume={bg_vol}[a2];[a1][a2]amix=inputs=2:duration=first[aout]" '
+                    f'-map 0:v -map "[aout]" -c:v copy -c:a aac "{mixed_audio_file}"'
+                )
+                subprocess.run(mix_cmd, shell=True)
+                if os.path.exists(mixed_audio_file):
+                    cropped_file = mixed_audio_file
+
+            if enable_subs and model:
+                # Extract clean audio separately to prevent whisper load audio errors on square/custom formats
+                whisper_audio_path = os.path.join(DOWNLOAD_DIR, f"whisper_audio_{clip_num}.wav")
+                subprocess.run(f'ffmpeg -y -i "{cropped_file}" -vn -acodec pcm_s16le -ar 16000 -ac 1 "{whisper_audio_path}"', shell=True, capture_output=True)
+                
+                align_map = {"Top (Safe Zone)": "6", "Middle-Center": "5", "Bottom (Safe Zone)": "2"}
+                align_val = align_map[caption_align]
+                
+                _, _, _, anim_type, ass_color = get_subtitle_styling(style_preset)
+                ass_font_name = "Liberation Sans"
+
+                result = model.transcribe(whisper_audio_path if os.path.exists(whisper_audio_path) else cropped_file, word_timestamps=True)
+                ass_file = os.path.join(DOWNLOAD_DIR, f"subs_{clip_num}.ass")
+                
+                with open(ass_file, "w", encoding="utf-8") as f:
+                    f.write(f"[Script Info]\nScriptType: v4.00+\nPlayResX: {scale_w}\nPlayResY: {scale_h}\n\n")
+                    f.write("[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
+                    
+                    margin_v_val = int(scale_h * 0.12) if "Bottom" in caption_align else (int(scale_h * 0.1) if "Top" in caption_align else int(scale_h * 0.5))
+                    render_ass_fontsize = int(font_size * (scale_h / 800))
+                    
+                    f.write(f"Style: Default,{ass_font_name},{render_ass_fontsize},{ass_color},&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},160,160,{margin_v_val},1\n\n")
+                    f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
+                    
+                    for segment in result['segments']:
+                        if 'words' in segment:
+                            words = segment['words']
+                            for i in range(0, len(words), words_per_line):
+                                chunk = words[i:i + words_per_line]
+                                start_t = chunk[0]['start']
+                                end_t = chunk[-1]['end']
+                                raw_str = " ".join([w['word'].strip() for w in chunk]).upper()
+                                
+                                render_wrap_width = max(10, int(18 - (font_size / 4)))
+                                wrapped_chunk = textwrap.wrap(raw_str, width=render_wrap_width)
+                                text_str = "\\N".join(wrapped_chunk)
+                                
+                                s_m, s_s = divmod(start_t, 60)
+                                s_h, s_m = divmod(s_m, 60)
+                                e_m, e_s = divmod(end_t, 60)
+                                e_h, e_m = divmod(e_m, 60)
+                                
+                                s_str = f"{int(s_h)}:{int(s_m):02d}:{int(s_s):02d}.{int((start_t%1)*100):02d}"
+                                e_str = f"{int(e_h)}:{int(e_m):02d}:{int(e_s):02d}.{int((end_t%1)*100):02d}"
+                                
+                                anim_tag = r"{\t(0,80,\fscx115\fscy115)\t(80,160,\fscx100\fscy100)}" if "Hormozi" in style_preset else ""
+                                    
+                                f.write(f"Dialogue: 0,{s_str},{e_str},Default,,0,0,0,,{anim_tag}{text_str}\n")
+
+                sub_cmd = (
+                    f'ffmpeg -y -i "{cropped_file}" '
+                    f'-vf "ass={ass_file}" '
+                    f'-c:v libx264 -preset ultrafast -c:a copy "{final_file}"'
+                )
+                subprocess.run(sub_cmd, shell=True)
+            else:
+                if os.path.exists(final_file):
+                    os.remove(final_file)
+                os.rename(cropped_file, final_file)
+
+            generated_clips.append((clip_num, final_file))
+
+    st.subheader("🎉 Shorts Export Gallery")
+    cols = st.columns(3)
+    for idx, (c_num, filepath) in enumerate(generated_clips):
+        col_target = cols[idx % 3]
+        with col_target:
+            st.markdown(f"**🎬 Short Clip {c_num}**")
+            st.video(filepath)
