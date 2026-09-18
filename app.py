@@ -64,7 +64,7 @@ st.markdown('<p class="sub-text">Transform your long video into multiple highlig
 col_left, col_right = st.columns([1.0, 1.3], gap="large")
 
 with col_right:
-    # --- 1. OUTPUT FORMAT SECTION (Heading on Left side of options) ---
+    # --- 1. OUTPUT FORMAT SECTION ---
     fmt_col1, fmt_col2 = st.columns([1.2, 2.8])
     with fmt_col1:
         st.markdown("<h4 style='padding-top: 5px;'>Output Format</h4>", unsafe_allow_html=True)
@@ -76,7 +76,6 @@ with col_right:
             label_visibility="collapsed"
         )
 
-    # Dimension, crop configurations, and safe preview rendering scales
     if "9:16" in output_format:
         scale_w, scale_h = 1080, 1920
         crop_filter = "crop=ih*9/16:ih"
@@ -87,7 +86,7 @@ with col_right:
         preview_scale_w, preview_scale_h = 480, 270
     else: # 1:1 Square
         scale_w, scale_h = 1080, 1080
-        crop_filter = "crop=ih:ih"
+        crop_filter = "crop=min(iw\\,ih):min(iw\\,ih)"
         preview_scale_w, preview_scale_h = 350, 350
 
     st.markdown("---")
@@ -97,51 +96,20 @@ with col_right:
     enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
     
     style_preset = st.selectbox("Subtitle Preset", [
-        "The Alex Hormozi Style",
-        "Border Pop-Up",
-        "Karaoke Highlight",
-        "The Power Word Scale",
-        "Glow & Shine Effect",
-        "The Minimal Subtitle Block",
-        "Apple Style Minimal",
-        "The Gradient Premium Stack",
-        "Real Estate Pro",
-        "The 3D Viral Text",
-        "Multiple Word Slide Up",
-        "Typewriter Effect",
-        "Flicker Text",
-        "Wave In / Bounce",
-        "Blur Fade In",
-        "Auto-Emoji Pop",
-        "TikTok Classic Style",
-        "Sound Effects Bracket",
-        "CapCut Auto Lyric Template",
-        "The Cyberpunk Neon"
+        "The Alex Hormozi Style", "Border Pop-Up", "Karaoke Highlight", "The Power Word Scale", 
+        "Glow & Shine Effect", "The Minimal Subtitle Block", "Apple Style Minimal", "The Gradient Premium Stack", 
+        "Real Estate Pro", "The 3D Viral Text", "Multiple Word Slide Up", "Typewriter Effect", 
+        "Flicker Text", "Wave In / Bounce", "Blur Fade In", "Auto-Emoji Pop", 
+        "TikTok Classic Style", "Sound Effects Bracket", "CapCut Auto Lyric Template", "The Cyberpunk Neon"
     ], index=0)
 
     s_col1, s_col2 = st.columns(2)
     with s_col1:
         font_choice = st.selectbox("Font", [
-            "Montserrat Black", "Impact Pro", "Arial Black", "Comic Neue Bold",
-            "Trebuchet MS Bold", "Ubuntu Bold", "Liberation Sans Bold", "DejaVu Sans Bold",
-            "Inter Heavy", "Roboto Black", "Poppins ExtraBold", "Oswald Bold",
-            "Anton Regular", "Bebas Neue Pro", "Nunito ExtraBold", "Raleway Black",
-            "Quicksand Bold", "Playfair Display Bold", "Merriweather Bold", "Fira Code Bold",
-            "JetBrains Mono Bold", "Space Grotesk Bold", "Syne ExtraBold", "DM Sans Bold",
-            "Work Sans Black", "PT Sans Bold", "Open Sans ExtraBold", "Lora Bold",
-            "Crimson Text Bold", "Cinzel Bold", "Archivo Black", "Cabin Bold",
-            "Mulish ExtraBold", "Barlow Condensed Bold", "Kanit Bold", "Prompt Bold",
-            "Sriracha Bold", "Caveat Bold", "Pacifico Pro", "Lobster Two",
-            "Bangers Regular", "Fredoka One", "Titan One", "Luckiest Guy",
-            "Chewy Regular", "Permanent Marker", "Amatic SC Bold", "Shadows Into Light",
-            "Righteous Regular", "Bungee Inline"
+            "Montserrat Black", "Impact Pro", "Arial Black", "Comic Neue Bold", "Ubuntu Bold", "Inter Heavy", "Roboto Black"
         ], index=0)
     with s_col2:
-        caption_align = st.selectbox("Position", [
-            "Bottom (Safe Zone)", 
-            "Middle-Center", 
-            "Top (Safe Zone)"
-        ], index=0)
+        caption_align = st.selectbox("Position", ["Bottom (Safe Zone)", "Middle-Center", "Top (Safe Zone)"], index=0)
 
     s_col3, s_col4 = st.columns(2)
     with s_col3:
@@ -194,11 +162,7 @@ with col_right:
         with f_col1:
             specific_filter = st.selectbox("Select Filter", specific_filter_options, index=0, key=f"sf_{st.session_state.reset_trigger}")
         with f_col2:
-            style_effect = st.selectbox("Style and Effects", [
-                "None", "AI Autofill", "Velocity (Auto Velocity)", "3D Zoom Pro", "AI Manga / Anime", "Cyberpunk / Neon Style", "Face Ageing (Old Age)", "Glitch Portrait",
-                "Glowing Lines", "Angel Wings / Demon Wings", "Lightning Eyes (Laser Eyes)", "Blur / Halo Blur", "Electro-Optical Face",
-                "Camera Shake", "Rebound Swing", "Flash / Black Flash", "Horizontal Shake / Jiggle", "Soft Vignette Glow", "VHS Glitch Overlay", "Cinematic Letterbox (Cinemascope)"
-            ], index=0, key=f"se_{st.session_state.reset_trigger}")
+            style_effect = st.selectbox("Style and Effects", ["None", "AI Autofill", "Velocity (Auto Velocity)", "3D Zoom Pro", "Camera Shake", "VHS Glitch Overlay"], index=0, key=f"se_{st.session_state.reset_trigger}")
 
         v_col1, v_col2 = st.columns(2)
         with v_col1:
@@ -313,18 +277,12 @@ with col_left:
             img = Image.open(preview_path)
             draw = ImageDraw.Draw(img)
             
-            # Only draw subtitles on preview if checkbox is enabled
             if enable_subs:
                 text_color, outline_color, _, _, _ = get_subtitle_styling(style_preset)
-
                 w, h = img.size
                 sample_words = ["CLIPPING", "PREVIEW", "VIRAL", "STUDIO"]
                 raw_text = " ".join(sample_words[:words_per_line])
                 
-                if "Hormozi" in style_preset or "Pop" in style_preset:
-                    raw_text = "💥 " + raw_text
-
-                # Strict wrapping to ensure text stays well within safe box limits
                 wrap_width = max(8, int(16 - (font_size / 3)))
                 wrapped_lines = textwrap.wrap(raw_text, width=wrap_width)
                 wrapped_text = "\n".join(wrapped_lines)
@@ -417,13 +375,17 @@ if os.path.exists(video_path) and render_clicked:
                     cropped_file = mixed_audio_file
 
             if enable_subs and model:
+                whisper_audio_path = os.path.join(DOWNLOAD_DIR, f"whisper_audio_{clip_num}.wav")
+                subprocess.run(f'ffmpeg -y -i "{cropped_file}" -vn -acodec pcm_s16le -ar 16000 -ac 1 "{whisper_audio_path}"', shell=True, capture_output=True)
+                
                 align_map = {"Top (Safe Zone)": "6", "Middle-Center": "5", "Bottom (Safe Zone)": "2"}
                 align_val = align_map[caption_align]
                 
-                _, _, _, anim_type, ass_color = get_subtitle_styling(style_preset)
+                # Fixed single clean ASS color mapping to prevent duplicate double subtitles
+                ass_color = "&H00FFFF&" if "Hormozi" in style_preset else "&HFFFFFF&"
                 ass_font_name = "Liberation Sans"
 
-                result = model.transcribe(cropped_file, word_timestamps=True)
+                result = model.transcribe(whisper_audio_path if os.path.exists(whisper_audio_path) else cropped_file, word_timestamps=True)
                 ass_file = os.path.join(DOWNLOAD_DIR, f"subs_{clip_num}.ass")
                 
                 with open(ass_file, "w", encoding="utf-8") as f:
@@ -433,6 +395,7 @@ if os.path.exists(video_path) and render_clicked:
                     margin_v_val = int(scale_h * 0.12) if "Bottom" in caption_align else (int(scale_h * 0.1) if "Top" in caption_align else int(scale_h * 0.5))
                     render_ass_fontsize = int(font_size * (scale_h / 800))
                     
+                    # Single clean style declaration using proper alignment variable
                     f.write(f"Style: Default,{ass_font_name},{render_ass_fontsize},{ass_color},&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},160,160,{margin_v_val},1\n\n")
                     f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
                     
@@ -445,7 +408,6 @@ if os.path.exists(video_path) and render_clicked:
                                 end_t = chunk[-1]['end']
                                 raw_str = " ".join([w['word'].strip() for w in chunk]).upper()
                                 
-                                # Strict wrapping logic for ASS output to stay inside safe margins
                                 render_wrap_width = max(10, int(18 - (font_size / 4)))
                                 wrapped_chunk = textwrap.wrap(raw_str, width=render_wrap_width)
                                 text_str = "\\N".join(wrapped_chunk)
@@ -458,9 +420,7 @@ if os.path.exists(video_path) and render_clicked:
                                 s_str = f"{int(s_h)}:{int(s_m):02d}:{int(s_s):02d}.{int((start_t%1)*100):02d}"
                                 e_str = f"{int(e_h)}:{int(e_m):02d}:{int(e_s):02d}.{int((end_t%1)*100):02d}"
                                 
-                                anim_tag = r"{\t(0,80,\fscx115\fscy115)\t(80,160,\fscx100\fscy100)}" if "Hormozi" in style_preset else ""
-                                    
-                                f.write(f"Dialogue: 0,{s_str},{e_str},Default,,0,0,0,,{anim_tag}{text_str}\n")
+                                f.write(f"Dialogue: 0,{s_str},{e_str},Default,,0,0,0,,{text_str}\n")
 
                 sub_cmd = (
                     f'ffmpeg -y -i "{cropped_file}" '
