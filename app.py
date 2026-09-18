@@ -281,7 +281,7 @@ with col_left:
         target_time = "0"
         vf_preview_parts = []
         
-        # Determine X coordinate using safe clip function
+        # Determine X coordinate
         if st.session_state.enable_face_tracking:
             f_x = detect_face_center(video_path, target_time)
             if f_x:
@@ -291,13 +291,12 @@ with col_left:
         else:
             f_x_expr = f"in_w * {st.session_state.manual_offset_x / 100.0}"
 
-        # Determine Y coordinate (Up/Down)
+        # To allow vertical movement, let's make crop height slightly flexible or proportional
         f_y_expr = f"in_h * {st.session_state.manual_offset_y / 100.0}"
 
         if "9:16" in output_format:
-            # Fixed syntax using clip() instead of clamp() and proper positional parameters
             crop_w = f"ih*{scale_w}/{scale_h}"
-            crop_h = "ih"
+            crop_h = "ih*0.95"  # Slightly less than ih to allow vertical up/down movement room
             crop_x = f"clip({f_x_expr}-{crop_w}/2\\, 0\\, in_w-{crop_w})"
             crop_y = f"clip({f_y_expr}-{crop_h}/2\\, 0\\, in_h-{crop_h})"
             vf_preview_parts = [f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}"]
@@ -318,7 +317,6 @@ with col_left:
         vf_preview_parts.append(f"scale={preview_scale_w}:{preview_scale_h}")
         vf_preview_str = ",".join(vf_preview_parts)
 
-        # Dynamic preview path based on slider values to avoid caching
         dynamic_preview_path = os.path.join(DOWNLOAD_DIR, f"preview_frame_{st.session_state.manual_offset_x}_{st.session_state.manual_offset_y}.jpg")
 
         subprocess.run(
@@ -326,45 +324,47 @@ with col_left:
             shell=True, capture_output=True
         )
         
-        # --- PREVIEW IMAGE RENDERED FIRST ---
-        if os.path.exists(dynamic_preview_path):
-            img = Image.open(dynamic_preview_path)
-            draw = ImageDraw.Draw(img)
-            
-            if enable_subs:
-                text_color, outline_color, _, _, _ = get_subtitle_styling(style_preset)
-                w, h = img.size
-                sample_words = ["CLIPPING", "PREVIEW", "VIRAL", "STUDIO"]
-                raw_text = " ".join(sample_words[:words_per_line])
+        # --- SIDE-BY-SIDE LAYOUT: PREVIEW ON LEFT, CONTROLS ON RIGHT ---
+        prev_col, ctrl_col = st.columns([1.2, 1.1])
+        
+        with prev_col:
+            if os.path.exists(dynamic_preview_path):
+                img = Image.open(dynamic_preview_path)
+                draw = ImageDraw.Draw(img)
                 
-                wrap_width = max(8, int(16 - (font_size / 3)))
-                wrapped_lines = textwrap.wrap(raw_text, width=wrap_width)
-                wrapped_text = "\n".join(wrapped_lines)
+                if enable_subs:
+                    text_color, outline_color, _, _, _ = get_subtitle_styling(style_preset)
+                    w, h = img.size
+                    sample_words = ["CLIPPING", "PREVIEW", "VIRAL", "STUDIO"]
+                    raw_text = " ".join(sample_words[:words_per_line])
+                    
+                    wrap_width = max(8, int(16 - (font_size / 3)))
+                    wrapped_lines = textwrap.wrap(raw_text, width=wrap_width)
+                    wrapped_text = "\n".join(wrapped_lines)
 
-                preview_calc_size = int(font_size * (preview_scale_h / scale_h) * 2.2)
-                font = get_pro_font(font_choice, preview_calc_size)
+                    preview_calc_size = int(font_size * (preview_scale_h / scale_h) * 2.2)
+                    font = get_pro_font(font_choice, preview_calc_size)
 
-                if "Top" in caption_align:
-                    y_pos = int(h * 0.18)
-                elif "Middle-Center" in caption_align:
-                    y_pos = int(h * 0.5)
-                else:
-                    y_pos = int(h - int(h * 0.22))
+                    if "Top" in caption_align:
+                        y_pos = int(h * 0.18)
+                    elif "Middle-Center" in caption_align:
+                        y_pos = int(h * 0.5)
+                    else:
+                        y_pos = int(h - int(h * 0.22))
 
-                x_pos = int(w / 2)
-                draw.multiline_text(
-                    (x_pos, y_pos), wrapped_text, font=font, fill=text_color, 
-                    anchor="mm", align="center", stroke_width=max(1, int(preview_calc_size * 0.08)), stroke_fill=outline_color
-                )
-                
-            st.image(img, width=preview_scale_w, caption=f"Live Preview | Format: {output_format}")
-        else:
-            st.warning("Preview generating... agar image show na ho toh ek baar slider move karein.")
+                    x_pos = int(w / 2)
+                    draw.multiline_text(
+                        (x_pos, y_pos), wrapped_text, font=font, fill=text_color, 
+                        anchor="mm", align="center", stroke_width=max(1, int(preview_calc_size * 0.08)), stroke_fill=outline_color
+                    )
+                    
+                st.image(img, width=preview_scale_w, caption=f"Live Preview | {output_format}")
 
-        # --- CONTROLS PLACED BELOW PREVIEW IMAGE & ABOVE REMOVE BUTTON ---
-        st.checkbox("Enable Smart AI Face Tracking", key="enable_face_tracking")
-        st.slider("Manual Framing Offset (Left/Right)", min_value=0, max_value=100, key="manual_offset_x", help="0 = Left edge, 50 = Center, 100 = Right edge")
-        st.slider("Manual Framing Offset (Up/Down)", min_value=0, max_value=100, key="manual_offset_y", help="0 = Top edge, 50 = Center, 100 = Bottom edge")
+        with ctrl_col:
+            st.markdown("#### 🎛️ Framing Controls")
+            st.checkbox("Smart AI Face Tracking", key="enable_face_tracking")
+            st.slider("Horizontal (Left/Right)", min_value=0, max_value=100, key="manual_offset_x")
+            st.slider("Vertical (Up/Down)", min_value=0, max_value=100, key="manual_offset_y")
             
         if st.button("❌ Remove / Change Video", use_container_width=True):
             os.remove(video_path)
@@ -407,7 +407,7 @@ if os.path.exists(video_path) and render_clicked:
 
             if "9:16" in output_format:
                 crop_w = f"ih*{scale_w}/{scale_h}"
-                crop_h = "ih"
+                crop_h = "ih*0.95"
                 crop_x = f"clip({f_x_expr}-{crop_w}/2\\, 0\\, in_w-{crop_w})"
                 crop_y = f"clip({f_y_expr}-{crop_h}/2\\, 0\\, in_h-{crop_h})"
                 render_vf_parts = [f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}"]
