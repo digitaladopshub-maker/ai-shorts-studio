@@ -4,6 +4,8 @@ import subprocess
 import os
 import textwrap
 import cv2
+import requests
+import re
 from PIL import Image, ImageDraw
 from fonts import get_pro_font
 from effects_engine import get_filter_ffmpeg_string, get_style_effect_ffmpeg_string
@@ -27,6 +29,31 @@ if not os.path.exists(DOWNLOAD_DIR):
 video_path = os.path.join(DOWNLOAD_DIR, "input_video.mp4")
 preview_path = os.path.join(DOWNLOAD_DIR, "preview_frame.jpg")
 bg_music_path = os.path.join(DOWNLOAD_DIR, "bg_music.mp3")
+
+def download_via_savefrom_api(url, output_path):
+    """SaveFrom API backup mechanism for maximum download speed without throttling."""
+    try:
+        api_url = "https://sf-api.com"
+        payload = {"url": url, "ext": "mp4"}
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        
+        response = requests.post(api_url, data=payload, headers=headers, timeout=15)
+        if response.status_code == 200:
+            data = response.json()
+            # Fast direct download link nikalna
+            if "url" in data and len(data["url"]) > 0:
+                direct_link = data["url"][0]["url"]
+                
+                # Direct streaming link se file write karna (Full Speed)
+                video_file = requests.get(direct_link, stream=True, timeout=30)
+                with open(output_path, 'wb') as f:
+                    for chunk in video_file.iter_content(chunk_size=1024*1024):
+                        if chunk:
+                            f.write(chunk)
+                return True
+    except Exception:
+        pass
+    return False
 
 def detect_face_center(v_path, start_sec):
     try:
@@ -58,46 +85,39 @@ with st.sidebar:
     if option == "Paste URL (YouTube / FB / Insta)":
         video_url = st.text_input("Video URL Paste Karein:")
         if video_url and st.button("Fetch & Download Video"):
-            with st.spinner("Downloading Video (Please wait)..."):
+            with st.spinner("Downloading Video at Full Speed (Please wait)..."):
                 if os.path.exists(video_path):
                     os.remove(video_path)
                 if os.path.exists(preview_path):
                     os.remove(preview_path)
                 
-                # FINAL FIX: Force IPv4 protocol along with web_embedded configurations to bypass the 'Page needs to be reloaded' blocker.
-                dl_cmd = (
-                    f'yt-dlp --force-ipv4 --no-check-certificates --geo-bypass --remote-components ejs:npm '
-                    f'--extractor-args "youtube:player_client=default,web_embedded" '
-                    f'-f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" '
-                    f'--merge-output-format mp4 '
-                    f'-o "{video_path}" "{video_url}"'
-                )
+                # METHOD 1: Pehle ultra-fast direct link method use karein (SaveFrom API emulation)
+                success = download_via_savefrom_api(video_url, video_path)
                 
-                result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
-                
-                if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-                    st.success("Video Successfully Downloaded & Saved!")
+                if success and os.path.exists(video_path) and os.path.getsize(video_path) > 0:
+                    st.success("Video Successfully Downloaded via High-Speed Pipeline!")
                 else:
-                    # Fallback approach using standard extraction sequence on failure
-                    fallback_cmd = (
-                        f'yt-dlp --force-ipv4 --no-check-certificates '
-                        f'--extractor-args "youtube:player_client=web_embedded" '
-                        f'-f "bestvideo+bestaudio/best" '
+                    # METHOD 2: Agar automatic link fetcher fail ho, to optimized yt-dlp run karein
+                    # --file-allocation-native aur multi-fragment parallel downloads speed barhane ke liye lagaye hain
+                    dl_cmd = (
+                        f'yt-dlp --force-ipv4 --no-check-certificates --geo-bypass '
+                        f'--concurrent-fragments 5 --file-allocation-native '
+                        f'--extractor-args "youtube:player_client=default,web_embedded" '
+                        f'-f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" '
                         f'--merge-output-format mp4 '
                         f'-o "{video_path}" "{video_url}"'
                     )
-                    fallback_result = subprocess.run(fallback_cmd, shell=True, capture_output=True, text=True)
+                    
+                    result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
                     
                     if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-                        st.success("Video Downloaded via Fallback & Saved!")
+                        st.success("Video Successfully Downloaded via Optimized Core Engine!")
                     else:
                         st.error("Download failed! Detailed Error:")
                         if result.stderr:
-                            st.markdown("**Main Command Error:**")
                             st.code(result.stderr[:400])
-                        if fallback_result.stderr:
-                            st.markdown("**Fallback Command Error:**")
-                            st.code(fallback_result.stderr[:400])
+                        else:
+                            st.error("Unknown network lag or restriction detected.")
 
     elif option == "Upload MP4 File":
         uploaded_file = st.file_uploader("Upload MP4 File", type=["mp4"])
