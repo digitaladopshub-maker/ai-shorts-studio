@@ -240,29 +240,18 @@ with col_left:
                     if os.path.exists(preview_path):
                         os.remove(preview_path)
                     
-                    dl_cmd = (
-                        f'yt-dlp --no-check-certificates --geo-bypass --remote-components ejs:npm '
-                        f'--extractor-args "youtube:player_client=web,mweb" '
-                        f'-f "bestvideo[ext=mp4]+bestaudio[ext=mp4]/best[ext=mp4]/best" '
-                        f'-o "{video_path}" "{video_url}"'
-                    )
+                    dl_cmd = f'yt-dlp --no-check-certificates -o "{video_path}" "{video_url}"'
                     result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
                     
                     if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
                         st.success("Video Successfully Downloaded & Saved!")
                         st.rerun()
                     else:
-                        fallback_cmd = f'yt-dlp --no-check-certificates --remote-components ejs:npm --extractor-args "youtube:player_client=ios" -o "{video_path}" "{video_url}"'
-                        subprocess.run(fallback_cmd, shell=True)
-                        if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-                            st.success("Video Downloaded via Fallback & Saved!")
-                            st.rerun()
+                        st.error("Download failed! Detailed Error:")
+                        if result.stderr:
+                            st.code(result.stderr[:400])
                         else:
-                            st.error("Download failed! Detailed Error:")
-                            if result.stderr:
-                                st.code(result.stderr[:400])
-                            else:
-                                st.error("Unknown error occurred during download.")
+                            st.error("Unknown error occurred during download.")
 
         elif option == "Upload MP4 File":
             uploaded_file = st.file_uploader("Upload MP4 File", type=["mp4"])
@@ -280,8 +269,13 @@ with col_left:
         vf_preview_parts = [crop_filter]
         if enable_face_tracking:
             f_x = detect_face_center(video_path, target_time)
-            if f_x and "9:16" in output_format:
-                vf_preview_parts = [f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"]
+            # Smart Fallback: Agar face detect na ho, toh exact center ki bajaye thoda left shift karein taake face cut na ho
+            if not f_x:
+                f_x = "in_w * 0.35" if "9:16" in output_format else "in_w / 2"
+                crop_filter_str = f"crop=ih*{scale_w}/{scale_h}:ih:clamp({f_x}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"
+            else:
+                crop_filter_str = f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"
+            vf_preview_parts = [crop_filter_str]
 
         if enable_flip:
             vf_preview_parts.append("hflip")
@@ -361,11 +355,17 @@ if os.path.exists(video_path) and render_clicked:
             cropped_file = os.path.join(DOWNLOAD_DIR, f"cropped_{clip_num}.mp4")
             final_file = os.path.join(DOWNLOAD_DIR, f"final_short_{clip_num}.mp4")
             
-            render_vf_parts = [crop_filter]
+            render_vf_parts = []
             if enable_face_tracking:
                 f_x = detect_face_center(video_path, start_sec)
-                if f_x and "9:16" in output_format:
-                    render_vf_parts = [f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"]
+                if not f_x:
+                    f_x_expr = "in_w * 0.35" if "9:16" in output_format else "in_w / 2"
+                    render_crop = f"crop=ih*{scale_w}/{scale_h}:ih:clamp({f_x_expr}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"
+                else:
+                    render_crop = f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"
+                render_vf_parts.append(render_crop)
+            else:
+                render_vf_parts.append(crop_filter)
 
             if enable_flip:
                 render_vf_parts.append("hflip")
@@ -454,7 +454,6 @@ if os.path.exists(video_path) and render_clicked:
                 base_dir = os.path.dirname(os.path.abspath(__file__))
                 fonts_dir = os.path.join(base_dir, "fonts")
                 
-                # CORRECT SYNTAX FOR FFMPEG ASS FILTER WITH FONTDIR
                 sub_cmd = (
                     f'ffmpeg -y -i "{cropped_file}" '
                     f'-vf "ass={ass_file}:fontsdir={fonts_dir}" '
