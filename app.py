@@ -211,7 +211,6 @@ with col_left:
                     if os.path.exists(preview_path):
                         os.remove(preview_path)
                     
-                    # Updated dl_cmd with robust player_client settings for SABR/403 bypass
                     dl_cmd = (
                         f'yt-dlp --no-check-certificates --geo-bypass --remote-components ejs:npm '
                         f'--extractor-args "youtube:player_client=web,mweb" '
@@ -382,7 +381,8 @@ if os.path.exists(video_path) and render_clicked:
                 align_map = {"Top (Safe Zone)": "6", "Middle-Center": "5", "Bottom (Safe Zone)": "2"}
                 align_val = align_map[caption_align]
                 
-                ass_color = "&H00FFFF&" if "Hormozi" in style_preset else "&HFFFFFF&"
+                # Single clean color mapping derived from get_subtitle_styling to prevent double/overlapping subtitles
+                text_col, _, _, _, ass_color = get_subtitle_styling(style_preset)
                 ass_font_name = "Liberation Sans"
 
                 result = model.transcribe(whisper_audio_path if os.path.exists(whisper_audio_path) else cropped_file, word_timestamps=True)
@@ -395,6 +395,7 @@ if os.path.exists(video_path) and render_clicked:
                     margin_v_val = int(scale_h * 0.12) if "Bottom" in caption_align else (int(scale_h * 0.1) if "Top" in caption_align else int(scale_h * 0.5))
                     render_ass_fontsize = int(font_size * (scale_h / 800))
                     
+                    # Single clean style declaration using preset color and selected position alignment
                     f.write(f"Style: Default,{ass_font_name},{render_ass_fontsize},{ass_color},&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},160,160,{margin_v_val},1\n\n")
                     f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
                     
