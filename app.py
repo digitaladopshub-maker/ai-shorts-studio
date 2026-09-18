@@ -240,33 +240,32 @@ with col_left:
         if option == "Paste URL (YouTube / FB / Insta)":
             video_url = st.text_input("Video URL Paste Karein:")
             if video_url and st.button("Fetch & Download Video"):
-                with st.spinner("Downloading Video (Please wait)..."):
+                with st.spinner("Fetching & Downloading Video (Optimized Speed)..."):
                     if os.path.exists(video_path):
                         os.remove(video_path)
                     
+                    # Optimized yt-dlp command for fast fetching and robust format selection
                     dl_cmd = (
-                        f'yt-dlp --no-check-certificates --geo-bypass --remote-components ejs:npm '
-                        f'--extractor-args "youtube:player_client=web,mweb" '
-                        f'-f "bestvideo[ext=mp4]+bestaudio[ext=mp4]/best[ext=mp4]/best" '
+                        f'yt-dlp --no-check-certificates --geo-bypass '
+                        f'-f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" '
                         f'-o "{video_path}" "{video_url}"'
                     )
                     result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
                     
                     if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-                        st.success("Video Successfully Downloaded & Saved!")
+                        st.success("Video Successfully Fetched & Saved!")
                         st.rerun()
                     else:
-                        fallback_cmd = f'yt-dlp --no-check-certificates --remote-components ejs:npm --extractor-args "youtube:player_client=ios" -o "{video_path}" "{video_url}"'
+                        # Fallback simple command if standard format fails
+                        fallback_cmd = f'yt-dlp --no-check-certificates -o "{video_path}" "{video_url}"'
                         subprocess.run(fallback_cmd, shell=True)
                         if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-                            st.success("Video Downloaded via Fallback & Saved!")
+                            st.success("Video Fetched via Fallback & Saved!")
                             st.rerun()
                         else:
-                            st.error("Download failed! Detailed Error:")
+                            st.error("Fetch failed! Please check the URL or try another link.")
                             if result.stderr:
                                 st.code(result.stderr[:400])
-                            else:
-                                st.error("Unknown error occurred during download.")
 
         elif option == "Upload MP4 File":
             uploaded_file = st.file_uploader("Upload MP4 File", type=["mp4"])
@@ -294,7 +293,7 @@ with col_left:
 
         if "9:16" in output_format:
             crop_w = f"ih*{scale_w}/{scale_h}"
-            crop_h = "ih * 0.85"  # Height ko thoda chota kiya hai taake upar-neeche freely move kar sakein
+            crop_h = "ih * 0.85"
             crop_x = f"clip({f_x_expr}-{crop_w}/2\\, 0\\, in_w-{crop_w})"
             crop_y = f"clip({f_y_expr}-{crop_h}/2\\, 0\\, in_h-{crop_h})"
             vf_preview_parts = [f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}"]
