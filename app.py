@@ -211,10 +211,11 @@ with col_left:
                     if os.path.exists(preview_path):
                         os.remove(preview_path)
                     
+                    # Updated dl_cmd with robust player_client settings for SABR/403 bypass
                     dl_cmd = (
                         f'yt-dlp --no-check-certificates --geo-bypass --remote-components ejs:npm '
-                        f'--extractor-args "youtube:player_client=android,web" '
-                        f'-f "b[ext=mp4]/best[ext=mp4]/best" '
+                        f'--extractor-args "youtube:player_client=web,mweb" '
+                        f'-f "bestvideo[ext=mp4]+bestaudio[ext=mp4]/best[ext=mp4]/best" '
                         f'-o "{video_path}" "{video_url}"'
                     )
                     result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
@@ -283,9 +284,6 @@ with col_left:
                 sample_words = ["CLIPPING", "PREVIEW", "VIRAL", "STUDIO"]
                 raw_text = " ".join(sample_words[:words_per_line])
                 
-                if "Hormozi" in style_preset or "Pop" in style_preset:
-                    raw_text = "💥 " + raw_text
-
                 wrap_width = max(8, int(16 - (font_size / 3)))
                 wrapped_lines = textwrap.wrap(raw_text, width=wrap_width)
                 wrapped_text = "\n".join(wrapped_lines)
@@ -378,14 +376,13 @@ if os.path.exists(video_path) and render_clicked:
                     cropped_file = mixed_audio_file
 
             if enable_subs and model:
-                # Extract clean audio separately to prevent whisper load audio errors on square/custom formats
                 whisper_audio_path = os.path.join(DOWNLOAD_DIR, f"whisper_audio_{clip_num}.wav")
                 subprocess.run(f'ffmpeg -y -i "{cropped_file}" -vn -acodec pcm_s16le -ar 16000 -ac 1 "{whisper_audio_path}"', shell=True, capture_output=True)
                 
                 align_map = {"Top (Safe Zone)": "6", "Middle-Center": "5", "Bottom (Safe Zone)": "2"}
                 align_val = align_map[caption_align]
                 
-                _, _, _, anim_type, ass_color = get_subtitle_styling(style_preset)
+                ass_color = "&H00FFFF&" if "Hormozi" in style_preset else "&HFFFFFF&"
                 ass_font_name = "Liberation Sans"
 
                 result = model.transcribe(whisper_audio_path if os.path.exists(whisper_audio_path) else cropped_file, word_timestamps=True)
@@ -422,9 +419,7 @@ if os.path.exists(video_path) and render_clicked:
                                 s_str = f"{int(s_h)}:{int(s_m):02d}:{int(s_s):02d}.{int((start_t%1)*100):02d}"
                                 e_str = f"{int(e_h)}:{int(e_m):02d}:{int(e_s):02d}.{int((end_t%1)*100):02d}"
                                 
-                                anim_tag = r"{\t(0,80,\fscx115\fscy115)\t(80,160,\fscx100\fscy100)}" if "Hormozi" in style_preset else ""
-                                    
-                                f.write(f"Dialogue: 0,{s_str},{e_str},Default,,0,0,0,,{anim_tag}{text_str}\n")
+                                f.write(f"Dialogue: 0,{s_str},{e_str},Default,,0,0,0,,{text_str}\n")
 
                 sub_cmd = (
                     f'ffmpeg -y -i "{cropped_file}" '
