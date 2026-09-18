@@ -63,8 +63,11 @@ def detect_face_center(v_path, start_sec):
         face_cascade = cv2.CascadeClassifier(cascade_path)
         if face_cascade.empty():
             return None
-        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+        # More lenient parameters to detect faces accurately
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.05, minNeighbors=3, minSize=(30, 30))
         if len(faces) > 0:
+            # Pick the largest face if multiple are detected
+            faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
             x, y, w, h = faces[0]
             return x + (w // 2)
     except Exception:
@@ -270,10 +273,14 @@ with col_left:
         if enable_face_tracking:
             f_x = detect_face_center(video_path, target_time)
             if not f_x:
-                f_x_expr = "in_w * 0.35" if "9:16" in output_format else "in_w / 2"
+                f_x_expr = "in_w / 2"
+            else:
+                f_x_expr = str(f_x)
+            
+            if "9:16" in output_format:
                 crop_filter_str = f"crop=ih*{scale_w}/{scale_h}:ih:clamp({f_x_expr}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"
             else:
-                crop_filter_str = f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"
+                crop_filter_str = crop_filter
             vf_preview_parts = [crop_filter_str]
 
         if enable_flip:
@@ -354,12 +361,16 @@ if os.path.exists(video_path) and render_clicked:
             cropped_file = os.path.join(DOWNLOAD_DIR, f"cropped_{clip_num}.mp4")
             final_file = os.path.join(DOWNLOAD_DIR, f"final_short_{clip_num}.mp4")
             
-            # FAST NON-BLOCKING CROP & FACE POSITIONING
             render_vf_parts = []
             if enable_face_tracking:
-                # Agar face tracking on ho aur 9:16 vertical ho, toh safe smart offset use karein jo heavy cv2 scan na kare
+                f_x = detect_face_center(video_path, start_sec)
+                if not f_x:
+                    f_x_expr = "in_w / 2"
+                else:
+                    f_x_expr = str(f_x)
+                
                 if "9:16" in output_format:
-                    render_crop = f"crop=ih*{scale_w}/{scale_h}:ih:in_w*0.35:0"
+                    render_crop = f"crop=ih*{scale_w}/{scale_h}:ih:clamp({f_x_expr}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"
                 else:
                     render_crop = crop_filter
                 render_vf_parts.append(render_crop)
