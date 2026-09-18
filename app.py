@@ -281,7 +281,7 @@ with col_left:
         target_time = "0"
         vf_preview_parts = []
         
-        # Determine X coordinate
+        # Determine X coordinate using safe clip function
         if st.session_state.enable_face_tracking:
             f_x = detect_face_center(video_path, target_time)
             if f_x:
@@ -295,7 +295,12 @@ with col_left:
         f_y_expr = f"in_h * {st.session_state.manual_offset_y / 100.0}"
 
         if "9:16" in output_format:
-            vf_preview_parts = [f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x_expr}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):clamp(y={f_y_expr}-ih/2\\,0\\,in_h-ih)"]
+            # Fixed syntax using clip() instead of clamp() and proper positional parameters
+            crop_w = f"ih*{scale_w}/{scale_h}"
+            crop_h = "ih"
+            crop_x = f"clip({f_x_expr}-{crop_w}/2\\, 0\\, in_w-{crop_w})"
+            crop_y = f"clip({f_y_expr}-{crop_h}/2\\, 0\\, in_h-{crop_h})"
+            vf_preview_parts = [f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}"]
         else:
             vf_preview_parts = [crop_filter]
 
@@ -353,6 +358,8 @@ with col_left:
                 )
                 
             st.image(img, width=preview_scale_w, caption=f"Live Preview | Format: {output_format}")
+        else:
+            st.warning("Preview generating... agar image show na ho toh ek baar slider move karein.")
 
         # --- CONTROLS PLACED BELOW PREVIEW IMAGE & ABOVE REMOVE BUTTON ---
         st.checkbox("Enable Smart AI Face Tracking", key="enable_face_tracking")
@@ -399,7 +406,11 @@ if os.path.exists(video_path) and render_clicked:
             f_y_expr = f"in_h * {st.session_state.manual_offset_y / 100.0}"
 
             if "9:16" in output_format:
-                render_vf_parts = [f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x_expr}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):clamp(y={f_y_expr}-ih/2\\,0\\,in_h-ih)"]
+                crop_w = f"ih*{scale_w}/{scale_h}"
+                crop_h = "ih"
+                crop_x = f"clip({f_x_expr}-{crop_w}/2\\, 0\\, in_w-{crop_w})"
+                crop_y = f"clip({f_y_expr}-{crop_h}/2\\, 0\\, in_h-{crop_h})"
+                render_vf_parts = [f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}"]
             else:
                 render_vf_parts = [crop_filter]
 
