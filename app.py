@@ -105,24 +105,23 @@ with col_right:
 
     s_col1, s_col2 = st.columns(2)
     with s_col1:
-        # Saare 15 uploaded fonts ab dropdown mein available hain
         font_choice = st.selectbox("Font", [
-            "Antonio Zull Brush",
-            "Bebas Neue",
+            "AntonioZull-Brush",
+            "BebasNeue-Regular",
             "Impact Club",
             "Impact",
-            "Impact Brutas",
-            "Impacted",
-            "Impacted 2.0",
-            "Impact Extravagant",
+            "Impactbrutas",
+            "IMPACTED",
+            "Impacted2.0",
+            "Impact-Extravagant",
             "Interact",
-            "Montserrat Italic",
-            "Montserrat Regular",
-            "Popping Cute",
-            "Roboto Bold",
-            "Roboto Regular",
-            "San Antonio Charros"
-        ], index=3) # Default 'Impact' select rahega
+            "Montserrat-Italic-VariableFont_wght",
+            "Montserrat-VariableFont_wght",
+            "Popping-Cute",
+            "Roboto-Bold",
+            "Roboto-Regular",
+            "San Antonio Charros_personal_use_only"
+        ], index=3)
     with s_col2:
         caption_align = st.selectbox("Position", ["Bottom (Safe Zone)", "Middle-Center", "Top (Safe Zone)"], index=0)
 
@@ -302,7 +301,9 @@ with col_left:
                 wrapped_lines = textwrap.wrap(raw_text, width=wrap_width)
                 wrapped_text = "\n".join(wrapped_lines)
 
-                font = get_pro_font(font_choice, int(font_size * 0.9))
+                # EXACT PROPORTIONAL FONT CALCULATION FOR PREVIEW TO MATCH OUTPUT VIDEO
+                preview_calc_size = int(font_size * (preview_scale_h / scale_h) * 2.2)
+                font = get_pro_font(font_choice, preview_calc_size)
 
                 if "Top" in caption_align:
                     y_pos = int(h * 0.18)
@@ -314,7 +315,7 @@ with col_left:
                 x_pos = int(w / 2)
                 draw.multiline_text(
                     (x_pos, y_pos), wrapped_text, font=font, fill=text_color, 
-                    anchor="mm", align="center", stroke_width=3, stroke_fill=outline_color
+                    anchor="mm", align="center", stroke_width=max(1, int(preview_calc_size * 0.08)), stroke_fill=outline_color
                 )
                 
             st.image(img, width=preview_scale_w, caption=f"Live Preview | Format: {output_format}")
@@ -366,7 +367,7 @@ if os.path.exists(video_path) and render_clicked:
             render_vf_parts.append(f"scale={scale_w}:{scale_h}")
             
             if speed_val != 1.0:
-                render_vf_parts.append(f"setpts=PTS/{speed_val}")
+                render_vf_parts.append(setpts=PTS/{speed_val})
 
             render_vf_str = ",".join(render_vf_parts)
             audio_filter_str = f"atempo={speed_val}" if speed_val != 1.0 else "anull"
