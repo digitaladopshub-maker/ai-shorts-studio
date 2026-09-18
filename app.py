@@ -281,7 +281,6 @@ with col_left:
         target_time = "0"
         vf_preview_parts = []
         
-        # Determine X coordinate
         if st.session_state.enable_face_tracking:
             f_x = detect_face_center(video_path, target_time)
             if f_x:
@@ -291,12 +290,11 @@ with col_left:
         else:
             f_x_expr = f"in_w * {st.session_state.manual_offset_x / 100.0}"
 
-        # To allow vertical movement, let's make crop height slightly flexible or proportional
         f_y_expr = f"in_h * {st.session_state.manual_offset_y / 100.0}"
 
         if "9:16" in output_format:
             crop_w = f"ih*{scale_w}/{scale_h}"
-            crop_h = "ih*0.95"  # Slightly less than ih to allow vertical up/down movement room
+            crop_h = "ih * 0.85"  # Height ko thoda chota kiya hai taake upar-neeche freely move kar sakein
             crop_x = f"clip({f_x_expr}-{crop_w}/2\\, 0\\, in_w-{crop_w})"
             crop_y = f"clip({f_y_expr}-{crop_h}/2\\, 0\\, in_h-{crop_h})"
             vf_preview_parts = [f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}"]
@@ -407,7 +405,7 @@ if os.path.exists(video_path) and render_clicked:
 
             if "9:16" in output_format:
                 crop_w = f"ih*{scale_w}/{scale_h}"
-                crop_h = "ih*0.95"
+                crop_h = "ih * 0.85"
                 crop_x = f"clip({f_x_expr}-{crop_w}/2\\, 0\\, in_w-{crop_w})"
                 crop_y = f"clip({f_y_expr}-{crop_h}/2\\, 0\\, in_h-{crop_h})"
                 render_vf_parts = [f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}"]
