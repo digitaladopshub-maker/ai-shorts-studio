@@ -92,7 +92,7 @@ with col_right:
 
     st.markdown("---")
 
-    # --- 2. SUBTITLE / CAPTION SETTING (Restored from your robust working code) ---
+    # --- 2. SUBTITLE / CAPTION SETTING ---
     st.markdown("### ✍️ Subtitle Setting")
     enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
     
@@ -313,33 +313,37 @@ with col_left:
             img = Image.open(preview_path)
             draw = ImageDraw.Draw(img)
             
-            text_color, outline_color, _, _, _ = get_subtitle_styling(style_preset)
+            # Only draw subtitles on preview if checkbox is enabled
+            if enable_subs:
+                text_color, outline_color, _, _, _ = get_subtitle_styling(style_preset)
 
-            w, h = img.size
-            sample_words = ["CLIPPING", "PREVIEW", "VIRAL", "STUDIO"]
-            raw_text = " ".join(sample_words[:words_per_line])
-            
-            if "Hormozi" in style_preset or "Pop" in style_preset:
-                raw_text = "💥 " + raw_text
+                w, h = img.size
+                sample_words = ["CLIPPING", "PREVIEW", "VIRAL", "STUDIO"]
+                raw_text = " ".join(sample_words[:words_per_line])
+                
+                if "Hormozi" in style_preset or "Pop" in style_preset:
+                    raw_text = "💥 " + raw_text
 
-            wrap_width = max(10, int(22 - (font_size / 3)))
-            wrapped_lines = textwrap.wrap(raw_text, width=wrap_width)
-            wrapped_text = "\n".join(wrapped_lines)
+                # Strict wrapping to ensure text stays well within safe box limits
+                wrap_width = max(8, int(16 - (font_size / 3)))
+                wrapped_lines = textwrap.wrap(raw_text, width=wrap_width)
+                wrapped_text = "\n".join(wrapped_lines)
 
-            font = get_pro_font(font_choice, font_size)
+                font = get_pro_font(font_choice, int(font_size * 0.9))
 
-            if "Top" in caption_align:
-                y_pos = int(h * 0.18)
-            elif "Middle-Center" in caption_align:
-                y_pos = int(h * 0.5)
-            else:
-                y_pos = int(h - int(h * 0.25))
+                if "Top" in caption_align:
+                    y_pos = int(h * 0.18)
+                elif "Middle-Center" in caption_align:
+                    y_pos = int(h * 0.5)
+                else:
+                    y_pos = int(h - int(h * 0.22))
 
-            x_pos = int(w / 2)
-            draw.multiline_text(
-                (x_pos, y_pos), wrapped_text, font=font, fill=text_color, 
-                anchor="mm", align="center", stroke_width=3, stroke_fill=outline_color
-            )
+                x_pos = int(w / 2)
+                draw.multiline_text(
+                    (x_pos, y_pos), wrapped_text, font=font, fill=text_color, 
+                    anchor="mm", align="center", stroke_width=3, stroke_fill=outline_color
+                )
+                
             st.image(img, width=preview_scale_w, caption=f"Live Preview | Format: {output_format}")
             
         if st.button("❌ Remove / Change Video", use_container_width=True):
@@ -429,7 +433,7 @@ if os.path.exists(video_path) and render_clicked:
                     margin_v_val = int(scale_h * 0.12) if "Bottom" in caption_align else (int(scale_h * 0.1) if "Top" in caption_align else int(scale_h * 0.5))
                     render_ass_fontsize = int(font_size * (scale_h / 800))
                     
-                    f.write(f"Style: Default,{ass_font_name},{render_ass_fontsize},{ass_color},&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},120,120,{margin_v_val},1\n\n")
+                    f.write(f"Style: Default,{ass_font_name},{render_ass_fontsize},{ass_color},&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},160,160,{margin_v_val},1\n\n")
                     f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
                     
                     for segment in result['segments']:
@@ -441,7 +445,8 @@ if os.path.exists(video_path) and render_clicked:
                                 end_t = chunk[-1]['end']
                                 raw_str = " ".join([w['word'].strip() for w in chunk]).upper()
                                 
-                                render_wrap_width = max(12, int(20 - (font_size / 4)))
+                                # Strict wrapping logic for ASS output to stay inside safe margins
+                                render_wrap_width = max(10, int(18 - (font_size / 4)))
                                 wrapped_chunk = textwrap.wrap(raw_str, width=render_wrap_width)
                                 text_str = "\\N".join(wrapped_chunk)
                                 
