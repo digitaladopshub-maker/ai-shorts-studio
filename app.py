@@ -238,17 +238,21 @@ with col_left:
         option = st.radio("Input Method:", ("Upload MP4 File", "Paste URL (YouTube / FB / Insta)"))
 
         if option == "Paste URL (YouTube / FB / Insta)":
-            video_url = st.text_input("Video URL Paste Karein:")
-            if video_url and st.button("Fetch & Download Video"):
+            # URL input with form so user can just press Enter once to start downloading directly
+            with st.form("url_form"):
+                video_url = st.text_input("Video URL Paste Karein:")
+                fetch_submitted = st.form_submit_button("Fetch & Download Video", type="primary")
+
+            if fetch_submitted and video_url:
                 with st.spinner("Fetching & Downloading Video (Bypassing YouTube restrictions)..."):
                     if os.path.exists(video_path):
                         os.remove(video_path)
                     
-                    # Robust and anti-bot yt-dlp command with player clients and remote components
+                    # Updated yt-dlp arguments to handle n-challenge and player client issues smoothly
                     dl_cmd = (
-                        f'yt-dlp --no-check-certificates --geo-bypass --remote-components ejs:npm '
-                        f'--extractor-args "youtube:player_client=web,mweb" '
-                        f'-f "bestvideo[ext=mp4]+bestaudio[ext=mp4]/best[ext=mp4]/best" '
+                        f'yt-dlp --no-check-certificates --geo-bypass '
+                        f'--extractor-args "youtube:player_client=android,web" '
+                        f'-f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" '
                         f'-o "{video_path}" "{video_url}"'
                     )
                     result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
@@ -257,7 +261,6 @@ with col_left:
                         st.success("Video Successfully Fetched & Saved!")
                         st.rerun()
                     else:
-                        # Fallback iOS client command if web client fails
                         fallback_cmd = (
                             f'yt-dlp --no-check-certificates --geo-bypass '
                             f'--extractor-args "youtube:player_client=ios" '
