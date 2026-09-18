@@ -92,36 +92,71 @@ with col_right:
 
     st.markdown("---")
 
-    # --- 2. CAPTION STYLE SECTION (Moved to top position) ---
-    st.markdown("### Caption Style")
-    caption_style_options = [
-        "None", "Subtle Gray", "Shadow Mint", "Subtle Cyan", "Stamp Red", 
-        "Retro Gold", "Block Dark", "Racing", "Modern Dark", "Modern Boxed", 
-        "Chunky", "Clean", "Shadow Lime", "Tag Yellow", "Pop Purple", 
-        "Spotlight", "Outline Classic", "Exotic", "Golden", "Simple", 
-        "Pop Single", "Energy", "Bold", "Elegant", "Neon Pink"
-    ]
-    selected_caption_style = st.selectbox("Select Caption Preset", caption_style_options, index=0, label_visibility="collapsed")
+    # --- 2. SUBTITLE / CAPTION SETTING (Restored from your robust working code) ---
+    st.markdown("### ✍️ Subtitle Setting")
+    enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
+    
+    style_preset = st.selectbox("Subtitle Preset", [
+        "The Alex Hormozi Style",
+        "Border Pop-Up",
+        "Karaoke Highlight",
+        "The Power Word Scale",
+        "Glow & Shine Effect",
+        "The Minimal Subtitle Block",
+        "Apple Style Minimal",
+        "The Gradient Premium Stack",
+        "Real Estate Pro",
+        "The 3D Viral Text",
+        "Multiple Word Slide Up",
+        "Typewriter Effect",
+        "Flicker Text",
+        "Wave In / Bounce",
+        "Blur Fade In",
+        "Auto-Emoji Pop",
+        "TikTok Classic Style",
+        "Sound Effects Bracket",
+        "CapCut Auto Lyric Template",
+        "The Cyberpunk Neon"
+    ], index=0)
 
-    # Active backup Subtitle Setting for robust rendering compatibility
-    with st.expander("Advanced Subtitle Settings (Active Backend)"):
-        enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
-        s_col1, s_col2 = st.columns(2)
-        with s_col1:
-            font_choice = st.selectbox("Font", ["Montserrat Black", "Impact Pro", "Arial Black", "Ubuntu Bold"], index=0)
-        with s_col2:
-            caption_align = st.selectbox("Position", ["Bottom (Safe Zone)", "Middle-Center", "Top (Safe Zone)"], index=0)
+    s_col1, s_col2 = st.columns(2)
+    with s_col1:
+        font_choice = st.selectbox("Font", [
+            "Montserrat Black", "Impact Pro", "Arial Black", "Comic Neue Bold",
+            "Trebuchet MS Bold", "Ubuntu Bold", "Liberation Sans Bold", "DejaVu Sans Bold",
+            "Inter Heavy", "Roboto Black", "Poppins ExtraBold", "Oswald Bold",
+            "Anton Regular", "Bebas Neue Pro", "Nunito ExtraBold", "Raleway Black",
+            "Quicksand Bold", "Playfair Display Bold", "Merriweather Bold", "Fira Code Bold",
+            "JetBrains Mono Bold", "Space Grotesk Bold", "Syne ExtraBold", "DM Sans Bold",
+            "Work Sans Black", "PT Sans Bold", "Open Sans ExtraBold", "Lora Bold",
+            "Crimson Text Bold", "Cinzel Bold", "Archivo Black", "Cabin Bold",
+            "Mulish ExtraBold", "Barlow Condensed Bold", "Kanit Bold", "Prompt Bold",
+            "Sriracha Bold", "Caveat Bold", "Pacifico Pro", "Lobster Two",
+            "Bangers Regular", "Fredoka One", "Titan One", "Luckiest Guy",
+            "Chewy Regular", "Permanent Marker", "Amatic SC Bold", "Shadows Into Light",
+            "Righteous Regular", "Bungee Inline"
+        ], index=0)
+    with s_col2:
+        caption_align = st.selectbox("Position", [
+            "Bottom (Safe Zone)", 
+            "Middle-Center", 
+            "Top (Safe Zone)"
+        ], index=0)
 
-        s_col3, s_col4 = st.columns(2)
-        with s_col3:
-            font_size = st.slider("Font Size", 18, 40, 24)
-        with s_col4:
-            words_per_line = st.slider("Words Per Line", 1, 5, 2)
+    s_col3, s_col4 = st.columns(2)
+    with s_col3:
+        font_size_option = st.selectbox("Font Size", ["Small (18px)", "Medium (24px - Rec)", "Large (32px)", "Extra Large (40px)"], index=1)
+        font_size_map = {"Small (18px)": 18, "Medium (24px - Rec)": 24, "Large (32px)": 32, "Extra Large (40px)": 40}
+        font_size = font_size_map[font_size_option]
+    with s_col4:
+        words_per_line_option = st.selectbox("Words Per Line", ["1 Word", "2 Words (Recommended)", "3 Words", "4 Words", "5 Words"], index=1)
+        wpl_map = {"1 Word": 1, "2 Words (Recommended)": 2, "3 Words": 3, "4 Words": 4, "5 Words": 5}
+        words_per_line = wpl_map[words_per_line_option]
 
     st.markdown("---")
 
-    # --- 3. PROCESSING MODE SELECTION (Moved to lower position without top timing heading) ---
-    st.markdown("### Processing Mode Selection")
+    # --- 3. PROCESSING MODE SELECTION ---
+    st.markdown("### ⚙️ Processing Mode Selection")
     clip_mode = st.radio("Processing Mode Selection:", ("Manual Timestamps (Precise)", "Auto-Split AI (Smart Clips)"), label_visibility="collapsed")
     
     clip_ranges = []
@@ -159,17 +194,40 @@ with col_right:
         with f_col1:
             specific_filter = st.selectbox("Select Filter", specific_filter_options, index=0, key=f"sf_{st.session_state.reset_trigger}")
         with f_col2:
-            style_effect = st.selectbox("Style and Effects", ["None", "AI Autofill", "Velocity (Auto Velocity)", "3D Zoom Pro", "Camera Shake", "VHS Glitch Overlay"], index=0, key=f"se_{st.session_state.reset_trigger}")
+            style_effect = st.selectbox("Style and Effects", [
+                "None", "AI Autofill", "Velocity (Auto Velocity)", "3D Zoom Pro", "AI Manga / Anime", "Cyberpunk / Neon Style", "Face Ageing (Old Age)", "Glitch Portrait",
+                "Glowing Lines", "Angel Wings / Demon Wings", "Lightning Eyes (Laser Eyes)", "Blur / Halo Blur", "Electro-Optical Face",
+                "Camera Shake", "Rebound Swing", "Flash / Black Flash", "Horizontal Shake / Jiggle", "Soft Vignette Glow", "VHS Glitch Overlay", "Cinematic Letterbox (Cinemascope)"
+            ], index=0, key=f"se_{st.session_state.reset_trigger}")
 
-        enable_flip = st.checkbox("🔄 Horizontal Flip", value=False, key=f"flp_{st.session_state.reset_trigger}")
-        
+        v_col1, v_col2 = st.columns(2)
+        with v_col1:
+            enable_flip = st.checkbox("🔄 Horizontal Flip", value=False, key=f"flp_{st.session_state.reset_trigger}")
+        with v_col2:
+            video_speed = st.selectbox("Video Speed", ["1.0x (Normal)", "1.1x (Fast Viral)", "1.25x (Super Fast)"], index=0, key=f"spd_{st.session_state.reset_trigger}")
+            speed_val = 1.0 if "1.0x" in video_speed else (1.1 if "1.1x" in video_speed else 1.25)
+
+        if st.button("🔄 Reset Video Filters & Effects"):
+            st.session_state.reset_trigger += 1
+            st.rerun()
+
         enable_bg_music = st.checkbox("Add Background Music Track?", value=False)
+        bg_music_file = None
         if enable_bg_music:
             uploaded_music = st.file_uploader("Upload Background MP3 Audio File", type=["mp3", "wav"])
             if uploaded_music is not None:
                 with open(bg_music_path, "wb") as f:
                     f.write(uploaded_music.getbuffer())
                 st.success("Background Music Loaded!")
+                bg_music_file = bg_music_path
+
+            ac1, ac2 = st.columns(2)
+            with ac1:
+                orig_vol_pct = st.slider("Original Voice Volume (%)", min_value=0, max_value=200, value=100, step=5)
+                orig_vol = orig_vol_pct / 100.0
+            with ac2:
+                bg_vol_pct = st.slider("Background Music Volume (%)", min_value=0, max_value=100, value=15, step=1)
+                bg_vol = bg_vol_pct / 100.0
 
         enable_face_tracking = st.checkbox("Enable Smart AI Face Tracking", value=True)
 
@@ -178,59 +236,111 @@ with col_right:
 with col_left:
     if not os.path.exists(video_path):
         st.markdown("### 📥 Media Input")
-        uploaded_file = st.file_uploader("Drag and drop video here to upload", type=["mp4", "mov", "webm"])
-        if uploaded_file is not None:
-            if os.path.exists(preview_path):
-                os.remove(preview_path)
-            with open(video_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            st.success("File Uploaded Successfully!")
-            st.rerun()
+        option = st.radio("Input Method:", ("Upload MP4 File", "Paste URL (YouTube / FB / Insta)"))
 
-        st.markdown("<p style='text-align: center; color: #6b7280; font-weight: 500;'>Or</p>", unsafe_allow_html=True)
-        
-        video_url = st.text_input("Drop in the specific URL for your video", placeholder="Paste YouTube, TikTok, FB, Insta URL here...")
-        if video_url and st.button("Fetch & Download Video", use_container_width=True):
-            with st.spinner("Downloading Video (Please wait)..."):
-                if os.path.exists(video_path):
-                    os.remove(video_path)
-                if os.path.exists(preview_path):
-                    os.remove(preview_path)
-                
-                dl_cmd = (
-                    f'yt-dlp --no-check-certificates --geo-bypass --remote-components ejs:npm '
-                    f'-f "b[ext=mp4]/best[ext=mp4]/best" '
-                    f'-o "{video_path}" "{video_url}"'
-                )
-                result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
-                
-                if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-                    st.success("Video Successfully Downloaded!")
-                    st.rerun()
-                else:
-                    fallback_cmd = f'yt-dlp --no-check-certificates --remote-components ejs:npm -o "{video_path}" "{video_url}"'
-                    subprocess.run(fallback_cmd, shell=True)
+        if option == "Paste URL (YouTube / FB / Insta)":
+            video_url = st.text_input("Video URL Paste Karein:")
+            if video_url and st.button("Fetch & Download Video"):
+                with st.spinner("Downloading Video (Please wait)..."):
+                    if os.path.exists(video_path):
+                        os.remove(video_path)
+                    if os.path.exists(preview_path):
+                        os.remove(preview_path)
+                    
+                    dl_cmd = (
+                        f'yt-dlp --no-check-certificates --geo-bypass --remote-components ejs:npm '
+                        f'--extractor-args "youtube:player_client=android,web" '
+                        f'-f "b[ext=mp4]/best[ext=mp4]/best" '
+                        f'-o "{video_path}" "{video_url}"'
+                    )
+                    result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
+                    
                     if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-                        st.success("Video Downloaded via Fallback!")
+                        st.success("Video Successfully Downloaded & Saved!")
                         st.rerun()
                     else:
-                        st.error("Download failed! Check URL or network error.")
-                        if result.stderr:
-                            st.code(result.stderr[:400])
+                        fallback_cmd = f'yt-dlp --no-check-certificates --remote-components ejs:npm --extractor-args "youtube:player_client=ios" -o "{video_path}" "{video_url}"'
+                        subprocess.run(fallback_cmd, shell=True)
+                        if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
+                            st.success("Video Downloaded via Fallback & Saved!")
+                            st.rerun()
+                        else:
+                            st.error("Download failed! Detailed Error:")
+                            if result.stderr:
+                                st.code(result.stderr[:400])
+                            else:
+                                st.error("Unknown error occurred during download.")
+
+        elif option == "Upload MP4 File":
+            uploaded_file = st.file_uploader("Upload MP4 File", type=["mp4"])
+            if uploaded_file is not None:
+                if os.path.exists(preview_path):
+                    os.remove(preview_path)
+                with open(video_path, "wb") as f:
+                    f.write(uploaded_file.getbuffer())
+                st.success("File Uploaded & Saved!")
+                st.rerun()
     else:
         st.markdown("### 🎬 Loaded Video Preview")
         
         target_time = "0"
-        vf_preview_parts = [crop_filter, f"scale={preview_scale_w}:{preview_scale_h}"]
-        vf_preview_str = ",".join(vf_preview_parts)
+        vf_preview_parts = [crop_filter]
+        if enable_face_tracking:
+            f_x = detect_face_center(video_path, target_time)
+            if f_x and "9:16" in output_format:
+                vf_preview_parts = [f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"]
+
+        if enable_flip:
+            vf_preview_parts.append("hflip")
         
+        f_str = get_filter_ffmpeg_string(filter_category, specific_filter)
+        if f_str:
+            vf_preview_parts.append(f_str)
+
+        e_str = get_style_effect_ffmpeg_string(style_effect)
+        if e_str:
+            vf_preview_parts.append(e_str)
+
+        vf_preview_parts.append(f"scale={preview_scale_w}:{preview_scale_h}")
+        vf_preview_str = ",".join(vf_preview_parts)
+
         subprocess.run(
             f'ffmpeg -y -ss {target_time} -i "{video_path}" -vframes 1 -vf "{vf_preview_str}" "{preview_path}"', 
             shell=True, capture_output=True
         )
         
         if os.path.exists(preview_path):
-            st.image(preview_path, width=preview_scale_w, caption=f"Format: {output_format}")
+            img = Image.open(preview_path)
+            draw = ImageDraw.Draw(img)
+            
+            text_color, outline_color, _, _, _ = get_subtitle_styling(style_preset)
+
+            w, h = img.size
+            sample_words = ["CLIPPING", "PREVIEW", "VIRAL", "STUDIO"]
+            raw_text = " ".join(sample_words[:words_per_line])
+            
+            if "Hormozi" in style_preset or "Pop" in style_preset:
+                raw_text = "💥 " + raw_text
+
+            wrap_width = max(10, int(22 - (font_size / 3)))
+            wrapped_lines = textwrap.wrap(raw_text, width=wrap_width)
+            wrapped_text = "\n".join(wrapped_lines)
+
+            font = get_pro_font(font_choice, font_size)
+
+            if "Top" in caption_align:
+                y_pos = int(h * 0.18)
+            elif "Middle-Center" in caption_align:
+                y_pos = int(h * 0.5)
+            else:
+                y_pos = int(h - int(h * 0.25))
+
+            x_pos = int(w / 2)
+            draw.multiline_text(
+                (x_pos, y_pos), wrapped_text, font=font, fill=text_color, 
+                anchor="mm", align="center", stroke_width=3, stroke_fill=outline_color
+            )
+            st.image(img, width=preview_scale_w, caption=f"Live Preview | Format: {output_format}")
             
         if st.button("❌ Remove / Change Video", use_container_width=True):
             os.remove(video_path)
@@ -272,31 +382,57 @@ if os.path.exists(video_path) and render_clicked:
             if f_str:
                 render_vf_parts.append(f_str)
 
+            e_str = get_style_effect_ffmpeg_string(style_effect)
+            if e_str:
+                render_vf_parts.append(e_str)
+
             render_vf_parts.append(f"scale={scale_w}:{scale_h}")
+            
+            if speed_val != 1.0:
+                render_vf_parts.append(f"setpts=PTS/{speed_val}")
+
             render_vf_str = ",".join(render_vf_parts)
+            audio_filter_str = f"atempo={speed_val}" if speed_val != 1.0 else "anull"
 
             crop_cmd = (
                 f'ffmpeg -y -ss {start_sec} -i "{video_path}" -t {duration_sec} '
-                f'-vf "{render_vf_str}" '
+                f'-vf "{render_vf_str}" -af "{audio_filter_str}" '
                 f'-c:v libx264 -preset ultrafast -crf 20 -c:a aac "{cropped_file}"'
             )
             subprocess.run(crop_cmd, shell=True)
 
+            mixed_audio_file = os.path.join(DOWNLOAD_DIR, f"mixed_{clip_num}.mp4")
+            if enable_bg_music and os.path.exists(bg_music_path):
+                mix_cmd = (
+                    f'ffmpeg -y -i "{cropped_file}" -stream_loop -1 -i "{bg_music_path}" '
+                    f'-filter_complex "[0:a]volume={orig_vol}[a1];[1:a]volume={bg_vol}[a2];[a1][a2]amix=inputs=2:duration=first[aout]" '
+                    f'-map 0:v -map "[aout]" -c:v copy -c:a aac "{mixed_audio_file}"'
+                )
+                subprocess.run(mix_cmd, shell=True)
+                if os.path.exists(mixed_audio_file):
+                    cropped_file = mixed_audio_file
+
             if enable_subs and model:
                 align_map = {"Top (Safe Zone)": "6", "Middle-Center": "5", "Bottom (Safe Zone)": "2"}
-                align_val = align_map.get(caption_align, "2")
+                align_val = align_map[caption_align]
                 
-                _, _, _, _, ass_color = get_subtitle_styling(selected_caption_style)
+                _, _, _, anim_type, ass_color = get_subtitle_styling(style_preset)
+                ass_font_name = "Liberation Sans"
+
                 result = model.transcribe(cropped_file, word_timestamps=True)
                 ass_file = os.path.join(DOWNLOAD_DIR, f"subs_{clip_num}.ass")
                 
                 with open(ass_file, "w", encoding="utf-8") as f:
                     f.write(f"[Script Info]\nScriptType: v4.00+\nPlayResX: {scale_w}\nPlayResY: {scale_h}\n\n")
                     f.write("[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
-                    f.write(f"Style: Default,Liberation Sans,{int(font_size * 2.2)},{ass_color},&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},120,120,240,1\n\n")
+                    
+                    margin_v_val = int(scale_h * 0.12) if "Bottom" in caption_align else (int(scale_h * 0.1) if "Top" in caption_align else int(scale_h * 0.5))
+                    render_ass_fontsize = int(font_size * (scale_h / 800))
+                    
+                    f.write(f"Style: Default,{ass_font_name},{render_ass_fontsize},{ass_color},&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},120,120,{margin_v_val},1\n\n")
                     f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
                     
-                    for segment in result.get('segments', []):
+                    for segment in result['segments']:
                         if 'words' in segment:
                             words = segment['words']
                             for i in range(0, len(words), words_per_line):
@@ -305,6 +441,10 @@ if os.path.exists(video_path) and render_clicked:
                                 end_t = chunk[-1]['end']
                                 raw_str = " ".join([w['word'].strip() for w in chunk]).upper()
                                 
+                                render_wrap_width = max(12, int(20 - (font_size / 4)))
+                                wrapped_chunk = textwrap.wrap(raw_str, width=render_wrap_width)
+                                text_str = "\\N".join(wrapped_chunk)
+                                
                                 s_m, s_s = divmod(start_t, 60)
                                 s_h, s_m = divmod(s_m, 60)
                                 e_m, e_s = divmod(end_t, 60)
@@ -312,7 +452,10 @@ if os.path.exists(video_path) and render_clicked:
                                 
                                 s_str = f"{int(s_h)}:{int(s_m):02d}:{int(s_s):02d}.{int((start_t%1)*100):02d}"
                                 e_str = f"{int(e_h)}:{int(e_m):02d}:{int(e_s):02d}.{int((end_t%1)*100):02d}"
-                                f.write(f"Dialogue: 0,{s_str},{e_str},Default,,0,0,0,,{raw_str}\n")
+                                
+                                anim_tag = r"{\t(0,80,\fscx115\fscy115)\t(80,160,\fscx100\fscy100)}" if "Hormozi" in style_preset else ""
+                                    
+                                f.write(f"Dialogue: 0,{s_str},{e_str},Default,,0,0,0,,{anim_tag}{text_str}\n")
 
                 sub_cmd = (
                     f'ffmpeg -y -i "{cropped_file}" '
