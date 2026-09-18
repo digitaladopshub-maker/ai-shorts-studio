@@ -64,10 +64,10 @@ with st.sidebar:
                 if os.path.exists(preview_path):
                     os.remove(preview_path)
                 
-                # FIXED: 'ios,tv' clients forced and web/android skipped to bypass SABR 403 error.
+                # UPDATED: TV aur Creator clients ko force kiya hai jo SABR restrictions se bahar hain.
                 dl_cmd = (
                     f'yt-dlp --no-check-certificates --geo-bypass --remote-components ejs:npm '
-                    f'--extractor-args "youtube:player_client=ios,tv;skip=web,android" '
+                    f'--extractor-args "youtube:player_client=tv,creator;skip=web,android,ios" '
                     f'-f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" '
                     f'--merge-output-format mp4 '
                     f'-o "{video_path}" "{video_url}"'
@@ -78,11 +78,11 @@ with st.sidebar:
                 if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
                     st.success("Video Successfully Downloaded & Saved!")
                 else:
-                    # Fallback command also updated to use safe iOS player client
+                    # Fallback standard extraction strategy without custom clients
                     fallback_cmd = (
                         f'yt-dlp --no-check-certificates --remote-components ejs:npm '
-                        f'--extractor-args "youtube:player_client=ios" '
-                        f'-f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" '
+                        f'--extractor-args "youtube:player_client=tv" '
+                        f'-f "bestvideo+bestaudio/best" '
                         f'--merge-output-format mp4 '
                         f'-o "{video_path}" "{video_url}"'
                     )
@@ -190,5 +190,4 @@ if os.path.exists(video_path):
             font_size_map = {"Small (18px)": 18, "Medium (24px - Rec)": 24, "Large (32px)": 32, "Extra Large (40px)": 40}
             font_size = font_size_map[font_size_option]
         with s_col4:
-            # Code ends here as per your provided sample
             pass
