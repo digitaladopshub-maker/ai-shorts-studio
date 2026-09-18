@@ -54,23 +54,35 @@ with st.sidebar:
     if option == "Paste URL (YouTube / FB / Insta)":
         video_url = st.text_input("Video URL Paste Karein:")
         if video_url and st.button("Fetch & Download Video"):
-            with st.spinner("Downloading Video..."):
+            with st.spinner("Downloading Video (Please wait)..."):
                 if os.path.exists(video_path):
                     os.remove(video_path)
                 if os.path.exists(preview_path):
                     os.remove(preview_path)
                 
+                # Robust yt-dlp command supporting multiple platforms freely
                 dl_cmd = (
-                    f'yt-dlp --no-check-certificates '
-                    f'--extractor-args "youtube:player_client=ios,mweb" '
-                    f'-f "b[ext=mp4]/best[ext=mp4]/best" '
+                    f'yt-dlp --no-check-certificates --geo-bypass '
+                    f'--extractor-args "youtube:player_client=android,web" '
+                    f'-f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" '
                     f'-o "{video_path}" "{video_url}"'
                 )
-                subprocess.run(dl_cmd, shell=True)
-                if os.path.exists(video_path):
-                    st.success("Video Ready!")
+                
+                result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
+                
+                if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
+                    st.success("Video Successfully Downloaded!")
                 else:
-                    st.error("Download failed. Use File Upload option.")
+                    # Fallback command if format merging fails
+                    fallback_cmd = f'yt-dlp --no-check-certificates -o "{video_path}" "{video_url}"'
+                    subprocess.run(fallback_cmd, shell=True)
+                    
+                    if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
+                        st.success("Video Downloaded via Fallback!")
+                    else:
+                        st.error("Download failed! Link invalid ho sakta hai ya platform ne block kiya hai. Error log check karein.")
+                        if result.stderr:
+                            st.text(result.stderr[:300])
 
     elif option == "Upload MP4 File":
         uploaded_file = st.file_uploader("Upload MP4 File", type=["mp4"])
