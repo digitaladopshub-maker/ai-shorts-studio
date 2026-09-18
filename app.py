@@ -30,27 +30,26 @@ video_path = os.path.join(DOWNLOAD_DIR, "input_video.mp4")
 preview_path = os.path.join(DOWNLOAD_DIR, "preview_frame.jpg")
 bg_music_path = os.path.join(DOWNLOAD_DIR, "bg_music.mp3")
 
-def download_via_savefrom_api(url, output_path):
-    """SaveFrom API backup mechanism for maximum download speed without throttling."""
+def download_via_public_resolver(url, output_path):
+    """Streamlit Cloud optimized generic extractor for YouTube links."""
     try:
-        api_url = "https://sf-api.com"
-        payload = {"url": url, "ext": "mp4"}
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        
-        response = requests.post(api_url, data=payload, headers=headers, timeout=15)
-        if response.status_code == 200:
-            data = response.json()
-            # Fast direct download link nikalna
-            if "url" in data and len(data["url"]) > 0:
-                direct_link = data["url"][0]["url"]
-                
-                # Direct streaming link se file write karna (Full Speed)
-                video_file = requests.get(direct_link, stream=True, timeout=30)
-                with open(output_path, 'wb') as f:
-                    for chunk in video_file.iter_content(chunk_size=1024*1024):
-                        if chunk:
-                            f.write(chunk)
-                return True
+        # Pytube style resolution parameters for cloud networks
+        api_clean_url = f"https://cobalt.tools"
+        payload = {"url": url, "vQuality": "720", "isAudioOnly": False}
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        }
+        res = requests.post(api_clean_url, json=payload, headers=headers, timeout=10)
+        if res.status_code == 200 and "url" in res.json():
+            direct_link = res.json()["url"]
+            video_file = requests.get(direct_link, stream=True, timeout=30)
+            with open(output_path, 'wb') as f:
+                for chunk in video_file.iter_content(chunk_size=1024*1024):
+                    if chunk:
+                        f.write(chunk)
+            return True
     except Exception:
         pass
     return False
@@ -72,7 +71,7 @@ def detect_face_center(v_path, start_sec):
             return None
         faces = face_cascade.detectMultiScale(gray, 1.1, 4)
         if len(faces) > 0:
-            x, y, w, h = faces[0]
+            x, y, w, h = faces
             return x + (w // 2)
     except Exception:
         return None
@@ -85,39 +84,34 @@ with st.sidebar:
     if option == "Paste URL (YouTube / FB / Insta)":
         video_url = st.text_input("Video URL Paste Karein:")
         if video_url and st.button("Fetch & Download Video"):
-            with st.spinner("Downloading Video at Full Speed (Please wait)..."):
+            with st.spinner("Downloading Video on Streamlit Cloud Server (Please wait)..."):
                 if os.path.exists(video_path):
                     os.remove(video_path)
                 if os.path.exists(preview_path):
                     os.remove(preview_path)
                 
-                # METHOD 1: Pehle ultra-fast direct link method use karein (SaveFrom API emulation)
-                success = download_via_savefrom_api(video_url, video_path)
+                # METHOD 1: Cloud-friendly external routing pipeline (Streamlit cloud ke liye best)
+                success = download_via_public_resolver(video_url, video_path)
                 
                 if success and os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-                    st.success("Video Successfully Downloaded via High-Speed Pipeline!")
+                    st.success("Video Downloaded Successfully on Cloud!")
                 else:
-                    # METHOD 2: Agar automatic link fetcher fail ho, to optimized yt-dlp run karein
-                    # --file-allocation-native aur multi-fragment parallel downloads speed barhane ke liye lagaye hain
+                    # METHOD 2: Fallback command using static embedded parameters without restricted flags
                     dl_cmd = (
-                        f'yt-dlp --force-ipv4 --no-check-certificates --geo-bypass '
-                        f'--concurrent-fragments 5 --file-allocation-native '
-                        f'--extractor-args "youtube:player_client=default,web_embedded" '
-                        f'-f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" '
-                        f'--merge-output-format mp4 '
+                        f'yt-dlp --no-check-certificates --geo-bypass '
+                        f'--extractor-args "youtube:player_client=web_embedded" '
+                        f'-f "best[ext=mp4]/best" '
                         f'-o "{video_path}" "{video_url}"'
                     )
                     
                     result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
                     
                     if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-                        st.success("Video Successfully Downloaded via Optimized Core Engine!")
+                        st.success("Video Downloaded via Fallback Engine!")
                     else:
-                        st.error("Download failed! Detailed Error:")
+                        st.error("Download failed! Streamlit IP is strictly limited by YouTube.")
                         if result.stderr:
-                            st.code(result.stderr[:400])
-                        else:
-                            st.error("Unknown network lag or restriction detected.")
+                            st.code(result.stderr[:200])
 
     elif option == "Upload MP4 File":
         uploaded_file = st.file_uploader("Upload MP4 File", type=["mp4"])
