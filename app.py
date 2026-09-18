@@ -244,16 +244,17 @@ with col_left:
                 fetch_submitted = st.form_submit_button("Fetch & Download Video", type="primary")
 
             if fetch_submitted and video_url:
-                with st.spinner("Fetching & Downloading Video (Bypassing Server Restrictions)..."):
+                with st.spinner("Fetching & Downloading Video (Using Cookies)..."):
                     if os.path.exists(video_path):
                         os.remove(video_path)
                     
-                    # Check if cookies file exists to bypass server IP blocks
                     cookie_flag = f'--cookies "{cookies_path}"' if os.path.exists(cookies_path) else ''
                     
+                    # Updated extractor-args to use web/mweb/tv clients compatible with cookies
                     dl_cmd = (
                         f'yt-dlp --no-check-certificates --geo-bypass {cookie_flag} '
-                        f'--extractor-args "youtube:player_client=android,web" '
+                        f'--extractor-args "youtube:player_client=web,mweb,tv" '
+                        f'-f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" '
                         f'-o "{video_path}" "{video_url}"'
                     )
                     result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
@@ -262,9 +263,10 @@ with col_left:
                         st.success("Video Successfully Fetched & Saved!")
                         st.rerun()
                     else:
+                        # Fallback simple command with cookies
                         fallback_cmd = (
                             f'yt-dlp --no-check-certificates --geo-bypass {cookie_flag} '
-                            f'--extractor-args "youtube:player_client=ios" '
+                            f'-f "b[ext=mp4]/best" '
                             f'-o "{video_path}" "{video_url}"'
                         )
                         subprocess.run(fallback_cmd, shell=True)
@@ -272,7 +274,7 @@ with col_left:
                             st.success("Video Fetched via Fallback & Saved!")
                             st.rerun()
                         else:
-                            st.error("Fetch failed! Server IP restriction detected. Agar zaroorat paray toh app directory mein 'cookies.txt' file upload kar sakte hain.")
+                            st.error("Fetch failed! Detailed Error:")
                             if result.stderr:
                                 st.code(result.stderr[:400])
 
