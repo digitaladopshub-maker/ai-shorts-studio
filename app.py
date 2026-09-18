@@ -63,9 +63,8 @@ def detect_face_center(v_path, start_sec):
         face_cascade = cv2.CascadeClassifier(cascade_path)
         if face_cascade.empty():
             return None
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.05, minNeighbors=3, minSize=(30, 30))
+        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
         if len(faces) > 0:
-            faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
             x, y, w, h = faces[0]
             return x + (w // 2)
     except Exception:
@@ -165,7 +164,7 @@ with col_right:
             with c1:
                 s_start = st.text_input(f"Clip {i+1} Start (s)", value=str(i*30), key=f"start_{i}")
             with c2:
-                s_dur = st.text_input(f"Clip {i+1} Duration", value="8", key=f"dur_{i}")
+                s_dur = st.text_input(f"Clip {i+1} Duration", value="28", key=f"dur_{i}")
             clip_ranges.append((s_start, s_dur))
     else:
         target_clip_len = st.slider("Target Duration (Sec)", min_value=15, max_value=45, value=30)
@@ -224,6 +223,9 @@ with col_right:
                 bg_vol = bg_vol_pct / 100.0
 
         enable_face_tracking = st.checkbox("Enable Smart AI Face Tracking", value=True)
+        
+        # MANUAL FRAMING OFFSET SLIDER (Agar AI tracking fail ho toh manual adjust karne ke liye)
+        manual_offset = st.slider("Manual Framing Offset (Left/Right)", min_value=0, max_value=100, value=35, help="0 = Left edge, 50 = Center, 100 = Right edge")
 
     render_clicked = st.button("🚀 Render Shorts Batch Now", type="primary", use_container_width=True)
 
@@ -241,18 +243,29 @@ with col_left:
                     if os.path.exists(preview_path):
                         os.remove(preview_path)
                     
-                    dl_cmd = f'yt-dlp --no-check-certificates -o "{video_path}" "{video_url}"'
+                    dl_cmd = (
+                        f'yt-dlp --no-check-certificates --geo-bypass --remote-components ejs:npm '
+                        f'--extractor-args "youtube:player_client=web,mweb" '
+                        f'-f "bestvideo[ext=mp4]+bestaudio[ext=mp4]/best[ext=mp4]/best" '
+                        f'-o "{video_path}" "{video_url}"'
+                    )
                     result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
                     
                     if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
                         st.success("Video Successfully Downloaded & Saved!")
                         st.rerun()
                     else:
-                        st.error("Download failed! Detailed Error:")
-                        if result.stderr:
-                            st.code(result.stderr[:400])
+                        fallback_cmd = f'yt-dlp --no-check-certificates --remote-components ejs:npm --extractor-args "youtube:player_client=ios" -o "{video_path}" "{video_url}"'
+                        subprocess.run(fallback_cmd, shell=True)
+                        if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
+                            st.success("Video Downloaded via Fallback & Saved!")
+                            st.rerun()
                         else:
-                            st.error("Unknown error occurred during download.")
+                            st.error("Download failed! Detailed Error:")
+                            if result.stderr:
+                                st.code(result.stderr[:400])
+                            else:
+                                st.error("Unknown error occurred during download.")
 
         elif option == "Upload MP4 File":
             uploaded_file = st.file_uploader("Upload MP4 File", type=["mp4"])
@@ -270,17 +283,14 @@ with col_left:
         vf_preview_parts = [crop_filter]
         if enable_face_tracking:
             f_x = detect_face_center(video_path, target_time)
-            # SMART FALLBACK: Agar face detect na ho, toh center ki bajaye thoda left shift karein taake face cut na ho
             if not f_x:
-                f_x_expr = "in_w * 0.38" if "9:16" in output_format else "in_w / 2"
+                # Agar face detect na ho, toh manual slider ki percentage ke mutabiq crop position set hogi
+                f_x = f"in_w * {manual_offset / 100.0}"
             else:
-                f_x_expr = str(f_x)
-            
+                f_x = str(f_x)
+
             if "9:16" in output_format:
-                crop_filter_str = f"crop=ih*{scale_w}/{scale_h}:ih:clamp({f_x_expr}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"
-            else:
-                crop_filter_str = crop_filter
-            vf_preview_parts = [crop_filter_str]
+                vf_preview_parts = [f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"]
 
         if enable_flip:
             vf_preview_parts.append("hflip")
@@ -347,35 +357,29 @@ if os.path.exists(video_path) and render_clicked:
             try:
                 t_start, t_dur = int(s_st), int(s_du)
             except:
-                t_start, t_dur = idx * 30, 8
+                t_start, t_dur = idx * 30, 28
             tasks.append((idx + 1, t_start, t_dur))
     else:
-        tasks = [(1, 0, 8)]
+        tasks = [(1, 0, 30), (2, 35, 30), (3, 70, 30)]
 
     model = whisper.load_model("base") if enable_subs else None
     generated_clips = []
 
-    with st.spinner("Processing High-Quality Professional Shorts..."):
+    with st.spinner("Processing High-Quality Professional Shorts (Fast Speed)..."):
         for clip_num, start_sec, duration_sec in tasks:
             cropped_file = os.path.join(DOWNLOAD_DIR, f"cropped_{clip_num}.mp4")
             final_file = os.path.join(DOWNLOAD_DIR, f"final_short_{clip_num}.mp4")
             
-            render_vf_parts = []
+            render_vf_parts = [crop_filter]
             if enable_face_tracking:
                 f_x = detect_face_center(video_path, start_sec)
-                # SMART FALLBACK FOR RENDERING
                 if not f_x:
-                    f_x_expr = "in_w * 0.38" if "9:16" in output_format else "in_w / 2"
+                    f_x = f"in_w * {manual_offset / 100.0}"
                 else:
-                    f_x_expr = str(f_x)
-                
+                    f_x = str(f_x)
+
                 if "9:16" in output_format:
-                    render_crop = f"crop=ih*{scale_w}/{scale_h}:ih:clamp({f_x_expr}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"
-                else:
-                    render_crop = crop_filter
-                render_vf_parts.append(render_crop)
-            else:
-                render_vf_parts.append(crop_filter)
+                    render_vf_parts = [f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"]
 
             if enable_flip:
                 render_vf_parts.append("hflip")
@@ -391,7 +395,7 @@ if os.path.exists(video_path) and render_clicked:
             render_vf_parts.append(f"scale={scale_w}:{scale_h}")
             
             if speed_val != 1.0:
-                render_vf_parts.append(f"setpts=PTS/{speed_val}")
+                render_vf_parts.append(setpts=PTS/{speed_val})
 
             render_vf_str = ",".join(render_vf_parts)
             audio_filter_str = f"atempo={speed_val}" if speed_val != 1.0 else "anull"
