@@ -251,7 +251,7 @@ with col_left:
                 fetch_submitted = st.form_submit_button("Fetch & Download Video", type="primary")
 
             if fetch_submitted and video_url:
-                with st.spinner("Fetching & Downloading Video (Using Cookies & JS Runtimes)..."):
+                with st.spinner("Fetching & Downloading Video (Using Cookies & Node.js)..."):
                     if os.path.exists(video_path):
                         os.remove(video_path)
                     
@@ -260,7 +260,7 @@ with col_left:
                     dl_cmd = (
                         f'yt-dlp --no-check-certificates --geo-bypass {cookie_flag} '
                         f'--remote-components ejs:npm '
-                        f'--js-runtimes node,deno '
+                        f'--js-runtimes node '
                         f'-f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" '
                         f'-o "{video_path}" "{video_url}"'
                     )
@@ -272,7 +272,7 @@ with col_left:
                     else:
                         fallback_cmd = (
                             f'yt-dlp --no-check-certificates --geo-bypass {cookie_flag} '
-                            f'--js-runtimes node,deno '
+                            f'--js-runtimes node '
                             f'-f "b[ext=mp4]/best" '
                             f'-o "{video_path}" "{video_url}"'
                         )
