@@ -10,6 +10,13 @@ from fonts import get_pro_font, get_font_family
 from effects_engine import get_filter_ffmpeg_string, get_style_effect_ffmpeg_string
 from subtitle_engine import get_subtitle_styling
 
+# --- AUTOMATIC NODE.JS ALIAS FIX FOR LINUX SERVERS (YT-DLP EJS) ---
+if not shutil.which("node") and shutil.which("nodejs"):
+    try:
+        os.system("ln -sf /usr/bin/nodejs /usr/bin/node")
+    except:
+        pass
+
 st.set_page_config(page_title="AI Clipping Studio", layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown("""
@@ -244,16 +251,16 @@ with col_left:
                 fetch_submitted = st.form_submit_button("Fetch & Download Video", type="primary")
 
             if fetch_submitted and video_url:
-                with st.spinner("Fetching & Downloading Video (Using Cookies)..."):
+                with st.spinner("Fetching & Downloading Video (Using Cookies & Node.js)..."):
                     if os.path.exists(video_path):
                         os.remove(video_path)
                     
                     cookie_flag = f'--cookies "{cookies_path}"' if os.path.exists(cookies_path) else ''
                     
-                    # Updated extractor-args to use web/mweb/tv clients compatible with cookies
                     dl_cmd = (
                         f'yt-dlp --no-check-certificates --geo-bypass {cookie_flag} '
-                        f'--extractor-args "youtube:player_client=web,mweb,tv" '
+                        f'--remote-components ejs:npm '
+                        f'--js-runtimes node '
                         f'-f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" '
                         f'-o "{video_path}" "{video_url}"'
                     )
@@ -263,7 +270,6 @@ with col_left:
                         st.success("Video Successfully Fetched & Saved!")
                         st.rerun()
                     else:
-                        # Fallback simple command with cookies
                         fallback_cmd = (
                             f'yt-dlp --no-check-certificates --geo-bypass {cookie_flag} '
                             f'-f "b[ext=mp4]/best" '
