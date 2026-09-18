@@ -4,16 +4,28 @@ import subprocess
 import os
 import textwrap
 import cv2
-import requests
 from PIL import Image, ImageDraw
 from fonts import get_pro_font
 from effects_engine import get_filter_ffmpeg_string, get_style_effect_ffmpeg_string
 from subtitle_engine import get_subtitle_styling
 
-st.set_page_config(page_title="Clipping", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="AI Clipping Studio", layout="wide", initial_sidebar_state="collapsed")
 
-st.title("🎬 Clipping")
-st.caption("Free for every one")
+# Custom styling for modern professional look matching reference layout
+st.markdown("""
+    <style>
+        .main-title { font-size: 28px; font-weight: 700; color: #111827; margin-bottom: 0px; }
+        .sub-text { font-size: 14px; color: #6b7280; margin-bottom: 20px; }
+        .upload-box {
+            border: 2px dashed #d1d5db;
+            border-radius: 16px;
+            padding: 40px 20px;
+            text-align: center;
+            background-color: #f9fafb;
+            margin-bottom: 15px;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 if 'frame_time' not in st.session_state:
     st.session_state.frame_time = "0"
@@ -28,55 +40,6 @@ if not os.path.exists(DOWNLOAD_DIR):
 video_path = os.path.join(DOWNLOAD_DIR, "input_video.mp4")
 preview_path = os.path.join(DOWNLOAD_DIR, "preview_frame.jpg")
 bg_music_path = os.path.join(DOWNLOAD_DIR, "bg_music.mp3")
-
-def download_via_hardened_cloud_tunnel(url, output_path):
-    """
-    Advanced encrypted proxy pipeline built specifically for Streamlit Cloud infrastructure.
-    Bypasses YouTube 403 Forbidden and Page Reloading blocks via hardened API clusters.
-    """
-    endpoints = [
-        "https://cobalt.tools",
-        "https://wuk.sh",
-        "https://workers.dev"
-    ]
-    
-    # 2026 strict token headers mimicking an organic user device session
-    payload = {
-        "url": url,
-        "vQuality": "720",
-        "isAudioOnly": False,
-        "isNoTT": True,
-        "mute": False
-    }
-    
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "Origin": "https://cobalt.tools",
-        "Referer": "https://cobalt.tools",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
-    
-    for api_url in endpoints:
-        try:
-            res = requests.post(api_url, json=payload, headers=headers, timeout=15)
-            if res.status_code == 200:
-                data = res.json()
-                
-                # Handling generic response dictionary wrappers
-                direct_link = data.get("url") or data.get("stream") or data.get("picker", [{}])[0].get("url")
-                if direct_link:
-                    # Stream downloading to local ephemeral storage
-                    with requests.get(direct_link, stream=True, timeout=60) as r:
-                        r.raise_for_status()
-                        with open(output_path, 'wb') as f:
-                            for chunk in r.iter_content(chunk_size=1024*1024):
-                                if chunk:
-                                    f.write(chunk)
-                    return True
-        except Exception:
-            continue
-    return False
 
 def detect_face_center(v_path, start_sec):
     try:
@@ -95,47 +58,95 @@ def detect_face_center(v_path, start_sec):
             return None
         faces = face_cascade.detectMultiScale(gray, 1.1, 4)
         if len(faces) > 0:
-            x, y, w, h = faces
+            x, y, w, h = faces[0]
             return x + (w // 2)
     except Exception:
         return None
     return None
 
-with st.sidebar:
-    st.header("📥 1. Media Input")
-    option = st.radio("Input Method:", ("Upload MP4 File", "Paste URL (YouTube / FB / Insta)"))
+# --- HEADER SECTION ---
+st.markdown('<p class="main-title">AI Clipping</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-text">Transform your long video into multiple highlight reels—in just one click!</p>', unsafe_allow_html=True)
 
-    if option == "Paste URL (YouTube / FB / Insta)":
-        video_url = st.text_input("Video URL Paste Karein:")
-        if video_url and st.button("Fetch & Download Video"):
-            with st.spinner("Tunneling connection past YouTube firewall (Please wait)..."):
-                if os.path.exists(video_path):
-                    os.remove(video_path)
-                if os.path.exists(preview_path):
-                    os.remove(preview_path)
-                
-                # Fire the hardened proxy tunnel engine
-                success = download_via_hardened_cloud_tunnel(video_url, video_path)
-                
-                if success and os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-                    st.success("🎯 Video Successfully Fetched & Saved via Secure Cloud Link!")
-                    st.balloons()
-                else:
-                    st.error("🚨 Critical Error: YouTube's anti-bot framework blocked the public cloud hosting region.")
-                    st.info("💡 Alternate Option: Temporary download chalanay ke liye PC se 'Upload MP4 File' wala method use karein.")
+# --- MAIN LAYOUT SPLIT (Left: Media Input/Preview, Right: Configurations) ---
+col_left, col_right = st.columns([1.1, 1.2], gap="large")
 
-    elif option == "Upload MP4 File":
-        uploaded_file = st.file_uploader("Upload MP4 File", type=["mp4"])
+with col_left:
+    if not os.path.exists(video_path):
+        st.markdown("### 📥 Media Input")
+        
+        # Upload & URL input matching reference layout
+        uploaded_file = st.file_uploader("Drag and drop video here to upload (MP4, MOV, WEBM, max 10GB)", type=["mp4", "mov", "webm"])
         if uploaded_file is not None:
             if os.path.exists(preview_path):
                 os.remove(preview_path)
             with open(video_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
-            st.success("File Uploaded & Saved!")
+            st.success("File Uploaded Successfully!")
+            st.rerun()
+
+        st.markdown("<p style='text-align: center; color: #6b7280; font-weight: 500;'>Or</p>", unsafe_allow_html=True)
+        
+        video_url = st.text_input("Drop in the specific URL for your video", placeholder="Paste YouTube, TikTok, FB, Insta URL here...")
+        if video_url and st.button("Fetch & Download Video", use_container_width=True):
+            with st.spinner("Downloading Video (Please wait)..."):
+                if os.path.exists(video_path):
+                    os.remove(video_path)
+                if os.path.exists(preview_path):
+                    os.remove(preview_path)
+                
+                dl_cmd = (
+                    f'yt-dlp --no-check-certificates --geo-bypass --remote-components ejs:npm '
+                    f'-f "b[ext=mp4]/best[ext=mp4]/best" '
+                    f'-o "{video_path}" "{video_url}"'
+                )
+                result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
+                
+                if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
+                    st.success("Video Successfully Downloaded!")
+                    st.rerun()
+                else:
+                    fallback_cmd = f'yt-dlp --no-check-certificates --remote-components ejs:npm -o "{video_path}" "{video_url}"'
+                    subprocess.run(fallback_cmd, shell=True)
+                    if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
+                        st.success("Video Downloaded via Fallback!")
+                        st.rerun()
+                    else:
+                        st.error("Download failed! Check URL or network error.")
+                        if result.stderr:
+                            st.code(result.stderr[:400])
+    else:
+        # Video is present -> Show preview & remove option (similar to screenshot 002073)
+        st.markdown("### 🎬 Loaded Video Preview")
+        st.video(video_path)
+        if st.button("❌ Remove / Change Video", use_container_width=True):
+            os.remove(video_path)
+            if os.path.exists(preview_path):
+                os.remove(preview_path)
+            st.rerun()
+
+with col_right:
+    # --- OUTPUT FORMAT SECTION ---
+    st.markdown("### 📐 Output Format")
+    output_format = st.radio(
+        "Select Format", 
+        ["9:16 Vertical", "16:9 Landscape", "1:1 Square"], 
+        horizontal=True, 
+        label_visibility="collapsed"
+    )
+    
+    # Map output format to dimensions
+    if "9:16" in output_format:
+        scale_w, scale_h, preview_w, preview_h = 1080, 1920, 540, 960
+    elif "16:9" in output_format:
+        scale_w, scale_h, preview_w, preview_h = 1920, 1080, 960, 540
+    else:
+        scale_w, scale_h, preview_w, preview_h = 1080, 1080, 720, 720
 
     st.markdown("---")
-    st.header("⚙️ 2. Processing Setup")
-    
+
+    # --- CLIP DURATION / PROCESSING SETUP ---
+    st.markdown("### ⚙️ Clip Duration & Mode")
     if os.path.exists(video_path):
         clip_mode = st.radio("Processing Mode:", ("Manual Timestamps (Precise)", "Auto-Split AI (Smart Clips)"))
         
@@ -143,76 +154,178 @@ with st.sidebar:
         if clip_mode == "Manual Timestamps (Precise)":
             num_clips = st.number_input("Short Clips Quantity", min_value=1, max_value=5, value=1)
             for i in range(int(num_clips)):
-                st.markdown(f"**Clip {i+1} Config**")
                 c1, c2 = st.columns(2)
                 with c1:
-                    s_start = st.text_input(f"Start (s)", value=str(i*30), key=f"start_{i}")
+                    s_start = st.text_input(f"Clip {i+1} Start (s)", value=str(i*30), key=f"start_{i}")
                 with c2:
-                    s_dur = st.text_input(f"Duration", value="28", key=f"dur_{i}")
+                    s_dur = st.text_input(f"Clip {i+1} Duration", value="28", key=f"dur_{i}")
                 clip_ranges.append((s_start, s_dur))
         else:
             target_clip_len = st.slider("Target Duration (Sec)", min_value=15, max_value=45, value=30)
-            st.info("AI poori video ko process karke 3 clips cut karega.")
+            st.info("AI will automatically split video into smart clips.")
 
-if os.path.exists(video_path):
-    col_controls, col_preview = st.columns([1.4, 0.8])
-    
-    with col_controls:
-        # --- SECTION 1: SUBTITLE SETTING ---
-        st.markdown("### ✍️ Subtitle Setting")
+    st.markdown("---")
+
+    # --- CAPTION STYLE (New Grid UI Placeholder + Original Subtitle Backup) ---
+    st.markdown("### 🎨 Caption Style")
+    caption_style_options = [
+        "None", "Subtle Gray", "Shadow Mint", "Subtle Cyan", "Stamp Red", 
+        "Retro Gold", "Block Dark", "Racing", "Modern Dark", "Modern Boxed", 
+        "Chunky", "Clean", "Shadow Lime", "Tag Yellow", "Pop Purple", 
+        "Spotlight", "Outline Classic", "Exotic", "Golden", "Simple", 
+        "Pop Single", "Energy", "Bold", "Elegant", "Neon Pink"
+    ]
+    selected_caption_style = st.selectbox("Select Caption Preset", caption_style_options, index=0)
+
+    # Active backup Subtitle Setting for robust rendering compatibility
+    with st.expander("Advanced Subtitle Settings (Active Backend)"):
         enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
-        
-        style_preset = st.selectbox("Subtitle Preset", [
-            "The Alex Hormozi Style",
-            "Border Pop-Up",
-            "Karaoke Highlight",
-            "The Power Word Scale",
-            "Glow & Shine Effect",
-            "The Minimal Subtitle Block",
-            "Apple Style Minimal",
-            "The Gradient Premium Stack",
-            "Real Estate Pro",
-            "The 3D Viral Text",
-            "Multiple Word Slide Up",
-            "Typewriter Effect",
-            "Flicker Text",
-            "Wave In / Bounce",
-            "Blur Fade In",
-            "Auto-Emoji Pop",
-            "TikTok Classic Style",
-            "Sound Effects Bracket",
-            "CapCut Auto Lyric Template",
-            "The Cyberpunk Neon"
-        ], index=0)
-
         s_col1, s_col2 = st.columns(2)
         with s_col1:
-            font_choice = st.selectbox("Font", [
-                "Montserrat Black", "Impact Pro", "Arial Black", "Comic Neue Bold",
-                "Trebuchet MS Bold", "Ubuntu Bold", "Liberation Sans Bold", "DejaVu Sans Bold",
-                "Inter Heavy", "Roboto Black", "Poppins ExtraBold", "Oswald Bold",
-                "Anton Regular", "Bebas Neue Pro", "Nunito ExtraBold", "Raleway Black",
-                "Quicksand Bold", "Playfair Display Bold", "Merriweather Bold", "Fira Code Bold",
-                "JetBrains Mono Bold", "Space Grotesk Bold", "Syne ExtraBold", "DM Sans Bold",
-                "Work Sans Black", "PT Sans Bold", "Open Sans ExtraBold", "Lora Bold",
-                "Crimson Text Bold", "Cinzel Bold", "Archivo Black", "Cabin Bold",
-                "Mulish ExtraBold", "Barlow Condensed Bold", "Kanit Bold", "Prompt Bold",
-                "Sriracha Bold", "Caveat Bold", "Pacifico Pro", "Lobster Two",
-                "Bangers Regular", "Fredoka One", "Titan One", "Luckiest Guy",
-                "Chewy Regular", "Permanent Marker", "Amatic SC Bold", "Shadows Into Light",
-                "Righteous Regular", "Bungee Inline"
-            ], index=0)
+            font_choice = st.selectbox("Font", ["Montserrat Black", "Impact Pro", "Arial Black", "Ubuntu Bold"], index=0)
         with s_col2:
-            caption_align = st.selectbox("Position", [
-                "Bottom (Safe Zone)", 
-                "Middle-Center", 
-                "Top (Safe Zone)"
-            ], index=0)
+            caption_align = st.selectbox("Position", ["Bottom (Safe Zone)", "Middle-Center", "Top (Safe Zone)"], index=0)
 
         s_col3, s_col4 = st.columns(2)
         with s_col3:
-            font_size_option = st.selectbox("Font Size", ["Small (18px)", "Medium (24px - Rec)", "Large (32px)", "Extra Large (40px)"], index=1)
-            font_size_map = {"Small (18px)": 18, "Medium (24px - Rec)": 24, "Large (32px)": 32, "Extra Large (40px)": 40}
-            font_size = font_size_map[font_size_option]
+            font_size = st.slider("Font Size", 18, 40, 24)
         with s_col4:
-            pass
+            words_per_line = st.slider("Words Per Line", 1, 5, 2)
+
+    st.markdown("---")
+
+    # --- VIDEO & AUDIO SETTING ---
+    with st.expander("🎥 Video Filters & 🎵 Audio Settings"):
+        filter_category = st.selectbox("Filter Category", [
+            "High Quality & Aesthetic Filters (For Face & Body)",
+            "🎬 Cinematic & Vibe Filters (For Travel & Vlogs)",
+            "🤖 Viral AI & Special Effects Filters"
+        ], index=0, key=f"fc_{st.session_state.reset_trigger}")
+
+        if filter_category == "High Quality & Aesthetic Filters (For Face & Body)":
+            specific_filter_options = ["None", "iPhone HD", "HD Glamour Filter", "Flash CCD", "Universal Sunset", "Bold Glamour", "Bubblegum"]
+        elif filter_category == "🎬 Cinematic & Vibe Filters (For Travel & Vlogs)":
+            specific_filter_options = ["None", "Cinematic Glow / HD", "Green Lake", "Renoir / Reno", "Moon Rise", "Bad Bunny", "Cool Vibes"]
+        else:
+            specific_filter_options = ["None", "Cartoon Filter AI", "Barbie Girl AI / Princess", "Kid Teen Now Aged", "Falling Filter", "2016 Filter", "Velocity x Color AD", "Thermal Effect", "Dreamy Halo"]
+
+        f_col1, f_col2 = st.columns(2)
+        with f_col1:
+            specific_filter = st.selectbox("Select Filter", specific_filter_options, index=0, key=f"sf_{st.session_state.reset_trigger}")
+        with f_col2:
+            style_effect = st.selectbox("Style and Effects", ["None", "AI Autofill", "Velocity (Auto Velocity)", "3D Zoom Pro", "Camera Shake", "VHS Glitch Overlay"], index=0, key=f"se_{st.session_state.reset_trigger}")
+
+        enable_flip = st.checkbox("🔄 Horizontal Flip", value=False, key=f"flp_{st.session_state.reset_trigger}")
+        
+        enable_bg_music = st.checkbox("Add Background Music Track?", value=False)
+        if enable_bg_music:
+            uploaded_music = st.file_uploader("Upload Background MP3 Audio File", type=["mp3", "wav"])
+            if uploaded_music is not None:
+                with open(bg_music_path, "wb") as f:
+                    f.write(uploaded_music.getbuffer())
+                st.success("Background Music Loaded!")
+
+        enable_face_tracking = st.checkbox("Enable Smart AI Face Tracking", value=True)
+
+    render_clicked = st.button("🚀 Render Shorts Batch Now", type="primary", use_container_width=True)
+
+# --- RENDERING & EXPORT GALLERY ---
+if os.path.exists(video_path) and render_clicked:
+    tasks = []
+    if 'clip_mode' in locals() and clip_mode == "Manual Timestamps (Precise)" and 'clip_ranges' in locals():
+        for idx, (s_st, s_du) in enumerate(clip_ranges):
+            try:
+                t_start, t_dur = int(s_st), int(s_du)
+            except:
+                t_start, t_dur = idx * 30, 28
+            tasks.append((idx + 1, t_start, t_dur))
+    else:
+        tasks = [(1, 0, 30), (2, 35, 30), (3, 70, 30)]
+
+    model = whisper.load_model("base") if enable_subs else None
+    generated_clips = []
+
+    with st.spinner("Processing High-Quality Professional Shorts..."):
+        for clip_num, start_sec, duration_sec in tasks:
+            cropped_file = os.path.join(DOWNLOAD_DIR, f"cropped_{clip_num}.mp4")
+            final_file = os.path.join(DOWNLOAD_DIR, f"final_short_{clip_num}.mp4")
+            
+            render_vf_parts = []
+            if enable_face_tracking:
+                f_x = detect_face_center(video_path, start_sec)
+                if f_x:
+                    render_vf_parts.append(f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0")
+                else:
+                    render_vf_parts.append(f"crop=ih*{scale_w}/{scale_h}:ih")
+            else:
+                render_vf_parts.append(f"crop=ih*{scale_w}/{scale_h}:ih")
+
+            if enable_flip:
+                render_vf_parts.append("hflip")
+            
+            f_str = get_filter_ffmpeg_string(filter_category, specific_filter)
+            if f_str:
+                render_vf_parts.append(f_str)
+
+            render_vf_parts.append(f"scale={scale_w}:{scale_h}")
+            render_vf_str = ",".join(render_vf_parts)
+
+            crop_cmd = (
+                f'ffmpeg -y -ss {start_sec} -i "{video_path}" -t {duration_sec} '
+                f'-vf "{render_vf_str}" '
+                f'-c:v libx264 -preset ultrafast -crf 20 -c:a aac "{cropped_file}"'
+            )
+            subprocess.run(crop_cmd, shell=True)
+
+            if enable_subs and model:
+                align_map = {"Top (Safe Zone)": "6", "Middle-Center": "5", "Bottom (Safe Zone)": "2"}
+                align_val = align_map.get(caption_align, "2")
+                
+                _, _, _, _, ass_color = get_subtitle_styling(selected_caption_style)
+                result = model.transcribe(cropped_file, word_timestamps=True)
+                ass_file = os.path.join(DOWNLOAD_DIR, f"subs_{clip_num}.ass")
+                
+                with open(ass_file, "w", encoding="utf-8") as f:
+                    f.write(f"[Script Info]\nScriptType: v4.00+\nPlayResX: {scale_w}\nPlayResY: {scale_h}\n\n")
+                    f.write("[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
+                    f.write(f"Style: Default,Liberation Sans,{int(font_size * 2.2)},{ass_color},&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},120,120,240,1\n\n")
+                    f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
+                    
+                    for segment in result.get('segments', []):
+                        if 'words' in segment:
+                            words = segment['words']
+                            for i in range(0, len(words), words_per_line):
+                                chunk = words[i:i + words_per_line]
+                                start_t = chunk[0]['start']
+                                end_t = chunk[-1]['end']
+                                raw_str = " ".join([w['word'].strip() for w in chunk]).upper()
+                                
+                                s_m, s_s = divmod(start_t, 60)
+                                s_h, s_m = divmod(s_m, 60)
+                                e_m, e_s = divmod(end_t, 60)
+                                e_h, e_m = divmod(e_m, 60)
+                                
+                                s_str = f"{int(s_h)}:{int(s_m):02d}:{int(s_s):02d}.{int((start_t%1)*100):02d}"
+                                e_str = f"{int(e_h)}:{int(e_m):02d}:{int(e_s):02d}.{int((end_t%1)*100):02d}"
+                                f.write(f"Dialogue: 0,{s_str},{e_str},Default,,0,0,0,,{raw_str}\n")
+
+                sub_cmd = (
+                    f'ffmpeg -y -i "{cropped_file}" '
+                    f'-vf "ass={ass_file}" '
+                    f'-c:v libx264 -preset ultrafast -c:a copy "{final_file}"'
+                )
+                subprocess.run(sub_cmd, shell=True)
+            else:
+                if os.path.exists(final_file):
+                    os.remove(final_file)
+                os.rename(cropped_file, final_file)
+
+            generated_clips.append((clip_num, final_file))
+
+    st.subheader("🎉 Shorts Export Gallery")
+    cols = st.columns(3)
+    for idx, (c_num, filepath) in enumerate(generated_clips):
+        col_target = cols[idx % 3]
+        with col_target:
+            st.markdown(f"**🎬 Short Clip {c_num}**")
+            st.video(filepath)
