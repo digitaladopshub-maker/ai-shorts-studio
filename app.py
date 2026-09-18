@@ -55,6 +55,7 @@ if os.path.exists(LOCAL_FONT_DIR):
 
 video_path = os.path.join(DOWNLOAD_DIR, "input_video.mp4")
 bg_music_path = os.path.join(DOWNLOAD_DIR, "bg_music.mp3")
+cookies_path = os.path.join(BASE_DIR, "cookies.txt")
 
 def detect_face_center(v_path, start_sec):
     try:
@@ -243,13 +244,16 @@ with col_left:
                 fetch_submitted = st.form_submit_button("Fetch & Download Video", type="primary")
 
             if fetch_submitted and video_url:
-                with st.spinner("Fetching & Downloading Video (Bypassing YouTube restrictions)..."):
+                with st.spinner("Fetching & Downloading Video (Bypassing Server Restrictions)..."):
                     if os.path.exists(video_path):
                         os.remove(video_path)
                     
+                    # Check if cookies file exists to bypass server IP blocks
+                    cookie_flag = f'--cookies "{cookies_path}"' if os.path.exists(cookies_path) else ''
+                    
                     dl_cmd = (
-                        f'yt-dlp --no-check-certificates --geo-bypass '
-                        f'--impersonate chrome '
+                        f'yt-dlp --no-check-certificates --geo-bypass {cookie_flag} '
+                        f'--extractor-args "youtube:player_client=android,web" '
                         f'-o "{video_path}" "{video_url}"'
                     )
                     result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
@@ -259,8 +263,8 @@ with col_left:
                         st.rerun()
                     else:
                         fallback_cmd = (
-                            f'yt-dlp --no-check-certificates --geo-bypass '
-                            f'--extractor-args "youtube:player_client=android" '
+                            f'yt-dlp --no-check-certificates --geo-bypass {cookie_flag} '
+                            f'--extractor-args "youtube:player_client=ios" '
                             f'-o "{video_path}" "{video_url}"'
                         )
                         subprocess.run(fallback_cmd, shell=True)
@@ -268,11 +272,9 @@ with col_left:
                             st.success("Video Fetched via Fallback & Saved!")
                             st.rerun()
                         else:
-                            st.error("Fetch failed! Detailed Error:")
+                            st.error("Fetch failed! Server IP restriction detected. Agar zaroorat paray toh app directory mein 'cookies.txt' file upload kar sakte hain.")
                             if result.stderr:
                                 st.code(result.stderr[:400])
-                            else:
-                                st.error("Unknown error occurred during download.")
 
         elif option == "Upload MP4 File":
             uploaded_file = st.file_uploader("Upload MP4 File", type=["mp4"])
