@@ -26,6 +26,12 @@ if 'frame_time' not in st.session_state:
 if 'reset_trigger' not in st.session_state:
     st.session_state.reset_trigger = 0
 
+if 'enable_face_tracking' not in st.session_state:
+    st.session_state.enable_face_tracking = True
+
+if 'manual_offset' not in st.session_state:
+    st.session_state.manual_offset = 35
+
 DOWNLOAD_DIR = "downloads"
 if not os.path.exists(DOWNLOAD_DIR):
     os.makedirs(DOWNLOAD_DIR, exist_ok=True)
@@ -274,24 +280,21 @@ with col_left:
     else:
         st.markdown("### 🎬 Loaded Video Preview")
         
-        # --- FACE TRACKING & MANUAL FRAMING CONTROLS MOVED UNDER PREVIEW ---
-        enable_face_tracking = st.checkbox("Enable Smart AI Face Tracking", value=True)
-        manual_offset = st.slider("Manual Framing Offset (Left/Right)", min_value=0, max_value=100, value=35, help="0 = Left edge, 50 = Center, 100 = Right edge")
-        
         target_time = "0"
         vf_preview_parts = []
         
-        if enable_face_tracking:
+        # Determine crop coordinate based on face tracking or manual offset slider
+        if st.session_state.enable_face_tracking:
             f_x = detect_face_center(video_path, target_time)
-            if not f_x:
-                f_x_expr = f"in_w * {manual_offset / 100.0}"
-            else:
+            if f_x:
                 f_x_expr = str(f_x)
-
-            if "9:16" in output_format:
-                vf_preview_parts = [f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x_expr}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"]
             else:
-                vf_preview_parts = [crop_filter]
+                f_x_expr = f"in_w * {st.session_state.manual_offset / 100.0}"
+        else:
+            f_x_expr = f"in_w * {st.session_state.manual_offset / 100.0}"
+
+        if "9:16" in output_format:
+            vf_preview_parts = [f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x_expr}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"]
         else:
             vf_preview_parts = [crop_filter]
 
@@ -346,6 +349,10 @@ with col_left:
                 
             st.image(img, width=preview_scale_w, caption=f"Live Preview | Format: {output_format}")
             
+        # --- CONTROLS PLACED BELOW PREVIEW PHOTO & ABOVE REMOVE BUTTON ---
+        st.checkbox("Enable Smart AI Face Tracking", key="enable_face_tracking")
+        st.slider("Manual Framing Offset (Left/Right)", min_value=0, max_value=100, key="manual_offset", help="0 = Left edge, 50 = Center, 100 = Right edge")
+            
         if st.button("❌ Remove / Change Video", use_container_width=True):
             os.remove(video_path)
             if os.path.exists(preview_path):
@@ -374,17 +381,17 @@ if os.path.exists(video_path) and render_clicked:
             final_file = os.path.join(DOWNLOAD_DIR, f"final_short_{clip_num}.mp4")
             
             render_vf_parts = []
-            if enable_face_tracking:
+            if st.session_state.enable_face_tracking:
                 f_x = detect_face_center(video_path, start_sec)
-                if not f_x:
-                    f_x_expr = f"in_w * {manual_offset / 100.0}"
-                else:
+                if f_x:
                     f_x_expr = str(f_x)
-
-                if "9:16" in output_format:
-                    render_vf_parts = [f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x_expr}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"]
                 else:
-                    render_vf_parts = [crop_filter]
+                    f_x_expr = f"in_w * {st.session_state.manual_offset / 100.0}"
+            else:
+                f_x_expr = f"in_w * {st.session_state.manual_offset / 100.0}"
+
+            if "9:16" in output_format:
+                render_vf_parts = [f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x_expr}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"]
             else:
                 render_vf_parts = [crop_filter]
 
