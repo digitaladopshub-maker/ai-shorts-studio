@@ -224,7 +224,7 @@ with col_right:
 
             ac1, ac2 = st.columns(2)
             with ac1:
-                orig_vol_pct = st.slider("Original Voice Volume (%)", min_value=0, max_value=200, value=100, step5)
+                orig_vol_pct = st.slider("Original Voice Volume (%)", min_value=0, max_value=200, value=100, step=5)
                 orig_vol = orig_vol_pct / 100.0
             with ac2:
                 bg_vol_pct = st.slider("Background Music Volume (%)", min_value=0, max_value=100, value=15, step=1)
@@ -247,7 +247,6 @@ with col_left:
                     if os.path.exists(video_path):
                         os.remove(video_path)
                     
-                    # Updated command using --impersonate chrome to bypass SABR/403 errors
                     dl_cmd = (
                         f'yt-dlp --no-check-certificates --geo-bypass '
                         f'--impersonate chrome '
