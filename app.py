@@ -11,7 +11,7 @@ from subtitle_engine import get_subtitle_styling
 
 st.set_page_config(page_title="AI Clipping Studio", layout="wide", initial_sidebar_state="collapsed")
 
-# Custom styling for professional look and fixed preview container
+# Custom styling for clean layout & fixed container bounds
 st.markdown("""
     <style>
         .main-title { font-size: 26px; font-weight: 700; color: #111827; margin-bottom: 0px; }
@@ -65,43 +65,52 @@ st.markdown('<p class="sub-text">Transform your long video into multiple highlig
 col_left, col_right = st.columns([1.0, 1.3], gap="large")
 
 with col_right:
-    # --- 1. TOP SECTION OF RIGHT COLUMN: Clip Duration & Output Format side-by-side ---
-    rc_1, rc_2 = st.columns(2)
-    
-    with rc_1:
-        st.markdown("### Clip duration")
-        clip_duration_preset = st.selectbox(
-            "Duration Option", 
-            ["Auto (0-3 min)", "Under 30s", "30s - 60s", "1 - 3 min", "3+ min"], 
-            label_visibility="collapsed"
-        )
-        
-    with rc_2:
-        st.markdown("### Output Format")
-        output_format = st.radio(
-            "Output Format Options", 
-            ["9:16 Vertical", "16:9 Landscape", "1:1 Square"], 
-            horizontal=True, 
-            label_visibility="collapsed"
-        )
+    # --- 1. OUTPUT FORMAT SECTION ---
+    st.markdown("### Output Format")
+    output_format = st.radio(
+        "Output Format Options", 
+        ["9:16 Vertical", "16:9 Landscape", "1:1 Square"], 
+        horizontal=True, 
+        label_visibility="collapsed"
+    )
 
-    # Dimension and crop configurations based on Output Format selection
+    # Dimension, crop configurations, and safe preview rendering scales
     if "9:16" in output_format:
         scale_w, scale_h = 1080, 1920
         crop_filter = "crop=ih*9/16:ih"
-        preview_width = 320
+        preview_scale_w, preview_scale_h = 270, 480
     elif "16:9" in output_format:
         scale_w, scale_h = 1920, 1080
         crop_filter = "crop=iw:iw*9/16"
-        preview_width = 450
+        preview_scale_w, preview_scale_h = 480, 270
     else: # 1:1 Square
         scale_w, scale_h = 1080, 1080
         crop_filter = "crop=ih:ih"
-        preview_width = 350
+        preview_scale_w, preview_scale_h = 350, 350
 
     st.markdown("---")
 
-    # --- 2. CAPTION STYLE SECTION ---
+    # --- 2. PROCESSING SETUP / MODE (Restored our preferred method) ---
+    st.markdown("### ⚙️ Processing Mode & Timing")
+    clip_mode = st.radio("Processing Mode Selection:", ("Manual Timestamps (Precise)", "Auto-Split AI (Smart Clips)"))
+    
+    clip_ranges = []
+    if clip_mode == "Manual Timestamps (Precise)":
+        num_clips = st.number_input("Short Clips Quantity", min_value=1, max_value=5, value=1)
+        for i in range(int(num_clips)):
+            c1, c2 = st.columns(2)
+            with c1:
+                s_start = st.text_input(f"Clip {i+1} Start (s)", value=str(i*30), key=f"start_{i}")
+            with c2:
+                s_dur = st.text_input(f"Clip {i+1} Duration", value="28", key=f"dur_{i}")
+            clip_ranges.append((s_start, s_dur))
+    else:
+        target_clip_len = st.slider("Target Duration (Sec)", min_value=15, max_value=45, value=30)
+        st.info("AI will automatically split video into smart clips.")
+
+    st.markdown("---")
+
+    # --- 3. CAPTION STYLE SECTION ---
     st.markdown("### Caption Style")
     caption_style_options = [
         "None", "Subtle Gray", "Shadow Mint", "Subtle Cyan", "Stamp Red", 
@@ -126,26 +135,6 @@ with col_right:
             font_size = st.slider("Font Size", 18, 40, 24)
         with s_col4:
             words_per_line = st.slider("Words Per Line", 1, 5, 2)
-
-    st.markdown("---")
-
-    # --- 3. PROCESSING SETUP / MODE ---
-    st.markdown("### ⚙️ Processing Mode")
-    clip_mode = st.radio("Processing Mode Selection:", ("Manual Timestamps (Precise)", "Auto-Split AI (Smart Clips)"), label_visibility="collapsed")
-    
-    clip_ranges = []
-    if clip_mode == "Manual Timestamps (Precise)":
-        num_clips = st.number_input("Short Clips Quantity", min_value=1, max_value=5, value=1)
-        for i in range(int(num_clips)):
-            c1, c2 = st.columns(2)
-            with c1:
-                s_start = st.text_input(f"Clip {i+1} Start (s)", value=str(i*30), key=f"start_{i}")
-            with c2:
-                s_dur = st.text_input(f"Clip {i+1} Duration", value="28", key=f"dur_{i}")
-            clip_ranges.append((s_start, s_dur))
-    else:
-        target_clip_len = st.slider("Target Duration (Sec)", min_value=15, max_value=45, value=30)
-        st.info("AI will automatically split video into smart clips.")
 
     st.markdown("---")
 
@@ -229,9 +218,9 @@ with col_left:
     else:
         st.markdown("### 🎬 Loaded Video Preview")
         
-        # Generate responsive preview frame matching selected output format dynamically
+        # Generate responsive preview frame cleanly bounded to selected dimensions
         target_time = "0"
-        vf_preview_parts = [crop_filter, f"scale={scale_w//4}:{scale_h//4}"]
+        vf_preview_parts = [crop_filter, f"scale={preview_scale_w}:{preview_scale_h}"]
         vf_preview_str = ",".join(vf_preview_parts)
         
         subprocess.run(
@@ -240,7 +229,7 @@ with col_left:
         )
         
         if os.path.exists(preview_path):
-            st.image(preview_path, width=preview_width, caption=f"Format: {output_format}")
+            st.image(preview_path, width=preview_scale_w, caption=f"Format: {output_format}")
             
         if st.button("❌ Remove / Change Video", use_container_width=True):
             os.remove(video_path)
