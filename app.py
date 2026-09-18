@@ -60,9 +60,9 @@ with st.sidebar:
                 if os.path.exists(preview_path):
                     os.remove(preview_path)
                 
-                # Robust yt-dlp command updated for latest YouTube restrictions / SABR error bypass
+                # Updated command with remote-components ejs support for YouTube JS challenges
                 dl_cmd = (
-                    f'yt-dlp --no-check-certificates --geo-bypass '
+                    f'yt-dlp --no-check-certificates --geo-bypass --remote-components ejs:npm '
                     f'-f "b[ext=mp4]/best[ext=mp4]/best" '
                     f'-o "{video_path}" "{video_url}"'
                 )
@@ -72,16 +72,17 @@ with st.sidebar:
                 if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
                     st.success("Video Successfully Downloaded!")
                 else:
-                    # Fallback command using iOS client extraction
-                    fallback_cmd = f'yt-dlp --no-check-certificates --extractor-args "youtube:player_client=ios" -o "{video_path}" "{video_url}"'
+                    fallback_cmd = f'yt-dlp --no-check-certificates --remote-components ejs:npm -o "{video_path}" "{video_url}"'
                     subprocess.run(fallback_cmd, shell=True)
                     
                     if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
                         st.success("Video Downloaded via Fallback!")
                     else:
-                        st.error("Download failed! Link invalid ho sakta hai ya platform ne block kiya hai.")
+                        st.error("Download failed! Detailed Error:")
                         if result.stderr:
                             st.code(result.stderr[:400])
+                        else:
+                            st.error("Unknown error occurred during download.")
 
     elif option == "Upload MP4 File":
         uploaded_file = st.file_uploader("Upload MP4 File", type=["mp4"])
