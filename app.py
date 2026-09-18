@@ -283,6 +283,9 @@ with col_left:
                 sample_words = ["CLIPPING", "PREVIEW", "VIRAL", "STUDIO"]
                 raw_text = " ".join(sample_words[:words_per_line])
                 
+                if "Hormozi" in style_preset or "Pop" in style_preset:
+                    raw_text = "💥 " + raw_text
+
                 wrap_width = max(8, int(16 - (font_size / 3)))
                 wrapped_lines = textwrap.wrap(raw_text, width=wrap_width)
                 wrapped_text = "\n".join(wrapped_lines)
@@ -375,14 +378,14 @@ if os.path.exists(video_path) and render_clicked:
                     cropped_file = mixed_audio_file
 
             if enable_subs and model:
+                # Extract clean audio separately to prevent whisper load audio errors on square/custom formats
                 whisper_audio_path = os.path.join(DOWNLOAD_DIR, f"whisper_audio_{clip_num}.wav")
                 subprocess.run(f'ffmpeg -y -i "{cropped_file}" -vn -acodec pcm_s16le -ar 16000 -ac 1 "{whisper_audio_path}"', shell=True, capture_output=True)
                 
                 align_map = {"Top (Safe Zone)": "6", "Middle-Center": "5", "Bottom (Safe Zone)": "2"}
                 align_val = align_map[caption_align]
                 
-                # Fixed single clean ASS color mapping to prevent duplicate double subtitles
-                ass_color = "&H00FFFF&" if "Hormozi" in style_preset else "&HFFFFFF&"
+                _, _, _, anim_type, ass_color = get_subtitle_styling(style_preset)
                 ass_font_name = "Liberation Sans"
 
                 result = model.transcribe(whisper_audio_path if os.path.exists(whisper_audio_path) else cropped_file, word_timestamps=True)
@@ -395,7 +398,6 @@ if os.path.exists(video_path) and render_clicked:
                     margin_v_val = int(scale_h * 0.12) if "Bottom" in caption_align else (int(scale_h * 0.1) if "Top" in caption_align else int(scale_h * 0.5))
                     render_ass_fontsize = int(font_size * (scale_h / 800))
                     
-                    # Single clean style declaration using proper alignment variable
                     f.write(f"Style: Default,{ass_font_name},{render_ass_fontsize},{ass_color},&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},160,160,{margin_v_val},1\n\n")
                     f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
                     
@@ -420,7 +422,9 @@ if os.path.exists(video_path) and render_clicked:
                                 s_str = f"{int(s_h)}:{int(s_m):02d}:{int(s_s):02d}.{int((start_t%1)*100):02d}"
                                 e_str = f"{int(e_h)}:{int(e_m):02d}:{int(e_s):02d}.{int((end_t%1)*100):02d}"
                                 
-                                f.write(f"Dialogue: 0,{s_str},{e_str},Default,,0,0,0,,{text_str}\n")
+                                anim_tag = r"{\t(0,80,\fscx115\fscy115)\t(80,160,\fscx100\fscy100)}" if "Hormozi" in style_preset else ""
+                                    
+                                f.write(f"Dialogue: 0,{s_str},{e_str},Default,,0,0,0,,{anim_tag}{text_str}\n")
 
                 sub_cmd = (
                     f'ffmpeg -y -i "{cropped_file}" '
