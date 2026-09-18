@@ -4,3 +4,4 @@ opencv-python-headless
 Pillow
 whisper-openai
 yt-dlp[default]
+yt-dlp-ejs
