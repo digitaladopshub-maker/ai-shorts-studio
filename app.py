@@ -62,7 +62,6 @@ if os.path.exists(LOCAL_FONT_DIR):
 
 video_path = os.path.join(DOWNLOAD_DIR, "input_video.mp4")
 bg_music_path = os.path.join(DOWNLOAD_DIR, "bg_music.mp3")
-cookies_path = os.path.join(BASE_DIR, "cookies.txt")
 
 def detect_face_center(v_path, start_sec):
     try:
@@ -251,16 +250,14 @@ with col_left:
                 fetch_submitted = st.form_submit_button("Fetch & Download Video", type="primary")
 
             if fetch_submitted and video_url:
-                with st.spinner("Fetching & Downloading Video (Using Cookies & Node.js)..."):
+                with st.spinner("Fetching & Downloading Video (Using iOS Client Bypass)..."):
                     if os.path.exists(video_path):
                         os.remove(video_path)
                     
-                    cookie_flag = f'--cookies "{cookies_path}"' if os.path.exists(cookies_path) else ''
-                    
+                    # Using iOS client extractor args to completely bypass n-challenge and page reload errors
                     dl_cmd = (
-                        f'yt-dlp --no-check-certificates --geo-bypass {cookie_flag} '
-                        f'--remote-components ejs:npm '
-                        f'--js-runtimes node '
+                        f'yt-dlp --no-check-certificates --geo-bypass '
+                        f'--extractor-args "youtube:player_client=ios" '
                         f'-f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" '
                         f'-o "{video_path}" "{video_url}"'
                     )
@@ -271,8 +268,8 @@ with col_left:
                         st.rerun()
                     else:
                         fallback_cmd = (
-                            f'yt-dlp --no-check-certificates --geo-bypass {cookie_flag} '
-                            f'--js-runtimes node '
+                            f'yt-dlp --no-check-certificates --geo-bypass '
+                            f'--extractor-args "youtube:player_client=mweb" '
                             f'-f "b[ext=mp4]/best" '
                             f'-o "{video_path}" "{video_url}"'
                         )
