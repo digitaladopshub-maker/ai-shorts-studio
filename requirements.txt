@@ -1,5 +1,5 @@
 streamlit
-git+https://github.com
+openai-whisper
 opencv-python-headless
 Pillow
 yt-dlp
