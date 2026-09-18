@@ -11,7 +11,6 @@ from subtitle_engine import get_subtitle_styling
 
 st.set_page_config(page_title="AI Clipping Studio", layout="wide", initial_sidebar_state="collapsed")
 
-# Custom styling for clean layout & fixed container bounds
 st.markdown("""
     <style>
         .main-title { font-size: 26px; font-weight: 700; color: #111827; margin-bottom: 0px; }
@@ -65,14 +64,17 @@ st.markdown('<p class="sub-text">Transform your long video into multiple highlig
 col_left, col_right = st.columns([1.0, 1.3], gap="large")
 
 with col_right:
-    # --- 1. OUTPUT FORMAT SECTION ---
-    st.markdown("### Output Format")
-    output_format = st.radio(
-        "Output Format Options", 
-        ["9:16 Vertical", "16:9 Landscape", "1:1 Square"], 
-        horizontal=True, 
-        label_visibility="collapsed"
-    )
+    # --- 1. OUTPUT FORMAT SECTION (Heading on Left side of options) ---
+    fmt_col1, fmt_col2 = st.columns([1.2, 2.8])
+    with fmt_col1:
+        st.markdown("<h4 style='padding-top: 5px;'>Output Format</h4>", unsafe_allow_html=True)
+    with fmt_col2:
+        output_format = st.radio(
+            "Output Format Options", 
+            ["9:16 Vertical", "16:9 Landscape", "1:1 Square"], 
+            horizontal=True, 
+            label_visibility="collapsed"
+        )
 
     # Dimension, crop configurations, and safe preview rendering scales
     if "9:16" in output_format:
@@ -90,27 +92,7 @@ with col_right:
 
     st.markdown("---")
 
-    # --- 2. PROCESSING SETUP / MODE (Restored our preferred method) ---
-    st.markdown("### ⚙️ Processing Mode & Timing")
-    clip_mode = st.radio("Processing Mode Selection:", ("Manual Timestamps (Precise)", "Auto-Split AI (Smart Clips)"))
-    
-    clip_ranges = []
-    if clip_mode == "Manual Timestamps (Precise)":
-        num_clips = st.number_input("Short Clips Quantity", min_value=1, max_value=5, value=1)
-        for i in range(int(num_clips)):
-            c1, c2 = st.columns(2)
-            with c1:
-                s_start = st.text_input(f"Clip {i+1} Start (s)", value=str(i*30), key=f"start_{i}")
-            with c2:
-                s_dur = st.text_input(f"Clip {i+1} Duration", value="28", key=f"dur_{i}")
-            clip_ranges.append((s_start, s_dur))
-    else:
-        target_clip_len = st.slider("Target Duration (Sec)", min_value=15, max_value=45, value=30)
-        st.info("AI will automatically split video into smart clips.")
-
-    st.markdown("---")
-
-    # --- 3. CAPTION STYLE SECTION ---
+    # --- 2. CAPTION STYLE SECTION (Moved to top position) ---
     st.markdown("### Caption Style")
     caption_style_options = [
         "None", "Subtle Gray", "Shadow Mint", "Subtle Cyan", "Stamp Red", 
@@ -135,6 +117,26 @@ with col_right:
             font_size = st.slider("Font Size", 18, 40, 24)
         with s_col4:
             words_per_line = st.slider("Words Per Line", 1, 5, 2)
+
+    st.markdown("---")
+
+    # --- 3. PROCESSING MODE SELECTION (Moved to lower position without top timing heading) ---
+    st.markdown("### Processing Mode Selection")
+    clip_mode = st.radio("Processing Mode Selection:", ("Manual Timestamps (Precise)", "Auto-Split AI (Smart Clips)"), label_visibility="collapsed")
+    
+    clip_ranges = []
+    if clip_mode == "Manual Timestamps (Precise)":
+        num_clips = st.number_input("Short Clips Quantity", min_value=1, max_value=5, value=1)
+        for i in range(int(num_clips)):
+            c1, c2 = st.columns(2)
+            with c1:
+                s_start = st.text_input(f"Clip {i+1} Start (s)", value=str(i*30), key=f"start_{i}")
+            with c2:
+                s_dur = st.text_input(f"Clip {i+1} Duration", value="28", key=f"dur_{i}")
+            clip_ranges.append((s_start, s_dur))
+    else:
+        target_clip_len = st.slider("Target Duration (Sec)", min_value=15, max_value=45, value=30)
+        st.info("AI will automatically split video into smart clips.")
 
     st.markdown("---")
 
@@ -218,7 +220,6 @@ with col_left:
     else:
         st.markdown("### 🎬 Loaded Video Preview")
         
-        # Generate responsive preview frame cleanly bounded to selected dimensions
         target_time = "0"
         vf_preview_parts = [crop_filter, f"scale={preview_scale_w}:{preview_scale_h}"]
         vf_preview_str = ",".join(vf_preview_parts)
