@@ -60,7 +60,7 @@ def detect_face_center(v_path, start_sec):
 st.markdown('<p class="main-title">AI Clipping</p>', unsafe_allow_html=True)
 st.markdown('<p class="sub-text">Transform your long video into multiple highlight reels—in just one click!</p>', unsafe_allow_html=True)
 
-# --- MAIN LAYOUT SPLIT (Left: Preview / Input, Right: Controls & Formats) ---
+# --- MAIN LAYOUT SPLIT ---
 col_left, col_right = st.columns([1.0, 1.3], gap="large")
 
 with col_right:
@@ -84,7 +84,7 @@ with col_right:
         scale_w, scale_h = 1920, 1080
         crop_filter = "crop=iw:iw*9/16"
         preview_scale_w, preview_scale_h = 480, 270
-    else: # 1:1 Square
+    else: 
         scale_w, scale_h = 1080, 1080
         crop_filter = "crop=min(iw\\,ih):min(iw\\,ih)"
         preview_scale_w, preview_scale_h = 350, 350
@@ -105,9 +105,24 @@ with col_right:
 
     s_col1, s_col2 = st.columns(2)
     with s_col1:
+        # Saare 15 uploaded fonts ab dropdown mein available hain
         font_choice = st.selectbox("Font", [
-            "Montserrat Black", "Impact Pro", "Arial Black", "Comic Neue Bold", "Ubuntu Bold", "Inter Heavy", "Roboto Black"
-        ], index=0)
+            "Antonio Zull Brush",
+            "Bebas Neue",
+            "Impact Club",
+            "Impact",
+            "Impact Brutas",
+            "Impacted",
+            "Impacted 2.0",
+            "Impact Extravagant",
+            "Interact",
+            "Montserrat Italic",
+            "Montserrat Regular",
+            "Popping Cute",
+            "Roboto Bold",
+            "Roboto Regular",
+            "San Antonio Charros"
+        ], index=3) # Default 'Impact' select rahega
     with s_col2:
         caption_align = st.selectbox("Position", ["Bottom (Safe Zone)", "Middle-Center", "Top (Safe Zone)"], index=0)
 
@@ -381,7 +396,6 @@ if os.path.exists(video_path) and render_clicked:
                 align_map = {"Top (Safe Zone)": "6", "Middle-Center": "5", "Bottom (Safe Zone)": "2"}
                 align_val = align_map[caption_align]
                 
-                # Single clean color mapping derived from get_subtitle_styling to prevent double/overlapping subtitles
                 text_col, _, _, _, ass_color = get_subtitle_styling(style_preset)
                 ass_font_name = "Liberation Sans"
 
@@ -395,7 +409,6 @@ if os.path.exists(video_path) and render_clicked:
                     margin_v_val = int(scale_h * 0.12) if "Bottom" in caption_align else (int(scale_h * 0.1) if "Top" in caption_align else int(scale_h * 0.5))
                     render_ass_fontsize = int(font_size * (scale_h / 800))
                     
-                    # Single clean style declaration using preset color and selected position alignment
                     f.write(f"Style: Default,{ass_font_name},{render_ass_fontsize},{ass_color},&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},160,160,{margin_v_val},1\n\n")
                     f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
                     
