@@ -3,3 +3,5 @@ git+https://github.com/openai/whisper.git
 opencv-python-headless
 yt-dlp
 Pillow
+whisper-openai
+yt-dlp>=2026.0.0
