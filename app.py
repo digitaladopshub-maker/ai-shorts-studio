@@ -5,7 +5,7 @@ import os
 import textwrap
 import cv2
 from PIL import Image, ImageDraw
-from fonts import get_pro_font
+from fonts import get_pro_font, get_font_family
 from effects_engine import get_filter_ffmpeg_string, get_style_effect_ffmpeg_string
 from subtitle_engine import get_subtitle_styling
 
@@ -121,7 +121,7 @@ with col_right:
             "Roboto-Bold",
             "Roboto-Regular",
             "San Antonio Charros_personal_use_only"
-        ], index=2) # Impact Club ko default ya select karne par test karne ke liye
+        ], index=2)
     with s_col2:
         caption_align = st.selectbox("Position", ["Bottom (Safe Zone)", "Middle-Center", "Top (Safe Zone)"], index=0)
 
@@ -393,22 +393,13 @@ if os.path.exists(video_path) and render_clicked:
                 whisper_audio_path = os.path.join(DOWNLOAD_DIR, f"whisper_audio_{clip_num}.wav")
                 subprocess.run(f'ffmpeg -y -i "{cropped_file}" -vn -acodec pcm_s16le -ar 16000 -ac 1 "{whisper_audio_path}"', shell=True, capture_output=True)
                 
-                align_map = {"Top (SafeZone)": "6", "Middle-Center": "5", "Bottom (SafeZone)": "2"}
+                align_map = {"Top (Safe Zone)": "6", "Middle-Center": "5", "Bottom (Safe Zone)": "2"}
                 align_val = align_map[caption_align]
                 
                 text_col, _, _, _, ass_color = get_subtitle_styling(style_preset)
                 
-                # DIRECT TTF FILE PATH DIRECTLY FOR FFMPEG/LIBASS
-                base_dir_path = os.path.dirname(os.path.abspath(__file__))
-                fonts_folder_path = os.path.join(base_dir_path, "fonts")
-                selected_ttf_file = font_choice if font_choice.endswith(".ttf") else font_choice + ".ttf"
-                full_font_path = os.path.join(fonts_folder_path, selected_ttf_file)
-                
-                if os.path.exists(full_font_path):
-                    # Libass mein file path ko forward slashes ya escaped format mein dena behtar hota hai
-                    ass_font_name = full_font_path.replace("\\", "/")
-                else:
-                    ass_font_name = "Impact"
+                # GET FONT FAMILY NAME MAPPING
+                ass_font_name = get_font_family(font_choice)
 
                 result = model.transcribe(whisper_audio_path if os.path.exists(whisper_audio_path) else cropped_file, word_timestamps=True)
                 ass_file = os.path.join(DOWNLOAD_DIR, f"subs_{clip_num}.ass")
@@ -418,7 +409,6 @@ if os.path.exists(video_path) and render_clicked:
                     f.write("[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
                     
                     margin_v_val = int(scale_h * 0.12) if "Bottom" in caption_align else (int(scale_h * 0.1) if "Top" in caption_align else int(scale_h * 0.5))
-                    
                     render_ass_fontsize = int(font_size * (scale_h / 480) * 1.5)
                     
                     f.write(f"Style: Default,{ass_font_name},{render_ass_fontsize},{ass_color},&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},160,160,{margin_v_val},1\n\n")
@@ -439,7 +429,7 @@ if os.path.exists(video_path) and render_clicked:
                                 
                                 s_m, s_s = divmod(start_t, 60)
                                 s_h, s_m = divmod(s_m, 60)
-                                e_m, e_s = divmod(end_t, 60)
+                                e_m, e_s = divmod(e_m, 60)
                                 e_h, e_m = divmod(e_m, 60)
                                 
                                 s_str = f"{int(s_h)}:{int(s_m):02d}:{int(s_s):02d}.{int((start_t%1)*100):02d}"
@@ -447,10 +437,13 @@ if os.path.exists(video_path) and render_clicked:
                                 
                                 f.write(f"Dialogue: 0,{s_str},{e_str},Default,,0,0,0,,{text_str}\n")
 
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+                fonts_dir = os.path.join(base_dir, "fonts")
+                
                 sub_cmd = (
-                    f'ffmpeg -y -i "{cropped_file}" '
+                    f'ffmpeg -y -fontsdir "{fonts_dir}" -i "{cropped_file}" '
                     f'-vf "ass={ass_file}" '
-                    f'-c:v libx264 -preset ultrafast -c:a copy "{final_file}"'
+                    f'-c:v libx264 -preset ultrafast -c:a aac "{final_file}"'
                 )
                 subprocess.run(sub_cmd, shell=True)
             else:
