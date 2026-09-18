@@ -63,10 +63,8 @@ def detect_face_center(v_path, start_sec):
         face_cascade = cv2.CascadeClassifier(cascade_path)
         if face_cascade.empty():
             return None
-        # More lenient parameters to detect faces accurately
         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.05, minNeighbors=3, minSize=(30, 30))
         if len(faces) > 0:
-            # Pick the largest face if multiple are detected
             faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
             x, y, w, h = faces[0]
             return x + (w // 2)
@@ -272,8 +270,9 @@ with col_left:
         vf_preview_parts = [crop_filter]
         if enable_face_tracking:
             f_x = detect_face_center(video_path, target_time)
+            # SMART FALLBACK: Agar face detect na ho, toh center ki bajaye thoda left shift karein taake face cut na ho
             if not f_x:
-                f_x_expr = "in_w / 2"
+                f_x_expr = "in_w * 0.38" if "9:16" in output_format else "in_w / 2"
             else:
                 f_x_expr = str(f_x)
             
@@ -364,8 +363,9 @@ if os.path.exists(video_path) and render_clicked:
             render_vf_parts = []
             if enable_face_tracking:
                 f_x = detect_face_center(video_path, start_sec)
+                # SMART FALLBACK FOR RENDERING
                 if not f_x:
-                    f_x_expr = "in_w / 2"
+                    f_x_expr = "in_w * 0.38" if "9:16" in output_format else "in_w / 2"
                 else:
                     f_x_expr = str(f_x)
                 
