@@ -224,7 +224,7 @@ with col_right:
 
         enable_face_tracking = st.checkbox("Enable Smart AI Face Tracking", value=True)
         
-        # MANUAL FRAMING OFFSET SLIDER (Agar AI tracking fail ho toh manual adjust karne ke liye)
+        # MANUAL FRAMING OFFSET SLIDER
         manual_offset = st.slider("Manual Framing Offset (Left/Right)", min_value=0, max_value=100, value=35, help="0 = Left edge, 50 = Center, 100 = Right edge")
 
     render_clicked = st.button("🚀 Render Shorts Batch Now", type="primary", use_container_width=True)
@@ -280,17 +280,22 @@ with col_left:
         st.markdown("### 🎬 Loaded Video Preview")
         
         target_time = "0"
-        vf_preview_parts = [crop_filter]
+        vf_preview_parts = []
+        
         if enable_face_tracking:
             f_x = detect_face_center(video_path, target_time)
             if not f_x:
-                # Agar face detect na ho, toh manual slider ki percentage ke mutabiq crop position set hogi
-                f_x = f"in_w * {manual_offset / 100.0}"
+                # Live Preview mein ab manual slider ki value apply hogi agar face detect na ho
+                f_x_expr = f"in_w * {manual_offset / 100.0}"
             else:
-                f_x = str(f_x)
+                f_x_expr = str(f_x)
 
             if "9:16" in output_format:
-                vf_preview_parts = [f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"]
+                vf_preview_parts = [f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x_expr}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"]
+            else:
+                vf_preview_parts = [crop_filter]
+        else:
+            vf_preview_parts = [crop_filter]
 
         if enable_flip:
             vf_preview_parts.append("hflip")
@@ -370,16 +375,20 @@ if os.path.exists(video_path) and render_clicked:
             cropped_file = os.path.join(DOWNLOAD_DIR, f"cropped_{clip_num}.mp4")
             final_file = os.path.join(DOWNLOAD_DIR, f"final_short_{clip_num}.mp4")
             
-            render_vf_parts = [crop_filter]
+            render_vf_parts = []
             if enable_face_tracking:
                 f_x = detect_face_center(video_path, start_sec)
                 if not f_x:
-                    f_x = f"in_w * {manual_offset / 100.0}"
+                    f_x_expr = f"in_w * {manual_offset / 100.0}"
                 else:
-                    f_x = str(f_x)
+                    f_x_expr = str(f_x)
 
                 if "9:16" in output_format:
-                    render_vf_parts = [f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"]
+                    render_vf_parts = [f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x_expr}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"]
+                else:
+                    render_vf_parts = [crop_filter]
+            else:
+                render_vf_parts = [crop_filter]
 
             if enable_flip:
                 render_vf_parts.append("hflip")
@@ -395,7 +404,7 @@ if os.path.exists(video_path) and render_clicked:
             render_vf_parts.append(f"scale={scale_w}:{scale_h}")
             
             if speed_val != 1.0:
-                render_vf_parts.append(setpts=PTS/{speed_val})
+                render_vf_parts.append(f"setpts=PTS/{speed_val}")
 
             render_vf_str = ",".join(render_vf_parts)
             audio_filter_str = f"atempo={speed_val}" if speed_val != 1.0 else "anull"
