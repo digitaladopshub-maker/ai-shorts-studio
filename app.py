@@ -51,7 +51,7 @@ with st.sidebar:
     st.header("📥 1. Media Input")
     option = st.radio("Input Method:", ("Upload MP4 File", "Paste URL (YouTube / FB / Insta)"))
 
-    if option == "Paste URL (YouTube / FB / Insta)":
+  if option == "Paste URL (YouTube / FB / Insta)":
         video_url = st.text_input("Video URL Paste Karein:")
         if video_url and st.button("Fetch & Download Video"):
             with st.spinner("Downloading Video (Please wait)..."):
@@ -60,13 +60,30 @@ with st.sidebar:
                 if os.path.exists(preview_path):
                     os.remove(preview_path)
                 
-                # Robust yt-dlp command supporting multiple platforms freely
+                # Updated bypass command for latest YouTube/SABR restrictions
                 dl_cmd = (
                     f'yt-dlp --no-check-certificates --geo-bypass '
-                    f'--extractor-args "youtube:player_client=android,web" '
-                    f'-f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" '
+                    f'-f "b[ext=mp4]/best[ext=mp4]/best" '
                     f'-o "{video_path}" "{video_url}"'
                 )
+                
+                result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
+                
+                if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
+                    st.success("Video Successfully Downloaded!")
+                else:
+                    # Alternative direct fallback command
+                    fallback_cmd = f'yt-dlp --no-check-certificates --extractor-args "youtube:player_client=ios" -o "{video_path}" "{video_url}"'
+                    subprocess.run(fallback_cmd, shell=True)
+                    
+                    if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
+                        st.success("Video Downloaded via iOS Client Fallback!")
+                    else:
+                        st.error("Download failed! Detailed Error:")
+                        if result.stderr:
+                            st.code(result.stderr)
+                        else:
+                            st.error("Unknown error occurred during download.")
                 
                 result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
                 
