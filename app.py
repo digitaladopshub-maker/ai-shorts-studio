@@ -11,19 +11,10 @@ from subtitle_engine import get_subtitle_styling
 
 st.set_page_config(page_title="AI Clipping Studio", layout="wide", initial_sidebar_state="collapsed")
 
-# Custom styling for modern professional look matching reference layout
 st.markdown("""
     <style>
         .main-title { font-size: 28px; font-weight: 700; color: #111827; margin-bottom: 0px; }
         .sub-text { font-size: 14px; color: #6b7280; margin-bottom: 20px; }
-        .upload-box {
-            border: 2px dashed #d1d5db;
-            border-radius: 16px;
-            padding: 40px 20px;
-            text-align: center;
-            background-color: #f9fafb;
-            margin-bottom: 15px;
-        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -68,15 +59,37 @@ def detect_face_center(v_path, start_sec):
 st.markdown('<p class="main-title">AI Clipping</p>', unsafe_allow_html=True)
 st.markdown('<p class="sub-text">Transform your long video into multiple highlight reels—in just one click!</p>', unsafe_allow_html=True)
 
-# --- MAIN LAYOUT SPLIT (Left: Media Input/Preview, Right: Configurations) ---
+# --- GLOBAL OUTPUT FORMAT SELECTION (So it controls preview & output dynamically) ---
+col_fmt1, col_fmt2 = st.columns([2, 2])
+with col_fmt1:
+    st.markdown("### 📐 Output Format")
+    output_format = st.radio(
+        "Select Format", 
+        ["9:16 Vertical", "16:9 Landscape", "1:1 Square"], 
+        horizontal=True, 
+        label_visibility="collapsed"
+    )
+
+# Dynamic dimensions mapping for preview and rendering
+if "9:16" in output_format:
+    scale_w, scale_h = 1080, 1920
+    crop_filter = "crop=ih*9/16:ih"
+elif "16:9" in output_format:
+    scale_w, scale_h = 1920, 1080
+    crop_filter = "crop=iw:iw*9/16"
+else: # 1:1 Square
+    scale_w, scale_h = 1080, 1080
+    crop_filter = "crop=ih:ih"
+
+st.markdown("---")
+
+# --- MAIN LAYOUT SPLIT ---
 col_left, col_right = st.columns([1.1, 1.2], gap="large")
 
 with col_left:
     if not os.path.exists(video_path):
         st.markdown("### 📥 Media Input")
-        
-        # Upload & URL input matching reference layout
-        uploaded_file = st.file_uploader("Drag and drop video here to upload (MP4, MOV, WEBM, max 10GB)", type=["mp4", "mov", "webm"])
+        uploaded_file = st.file_uploader("Drag and drop video here to upload (MP4, MOV, WEBM)", type=["mp4", "mov", "webm"])
         if uploaded_file is not None:
             if os.path.exists(preview_path):
                 os.remove(preview_path)
@@ -116,9 +129,21 @@ with col_left:
                         if result.stderr:
                             st.code(result.stderr[:400])
     else:
-        # Video is present -> Show preview & remove option (similar to screenshot 002073)
         st.markdown("### 🎬 Loaded Video Preview")
-        st.video(video_path)
+        
+        # Generate dynamic preview based on selected output format dimensions
+        target_time = "0"
+        vf_preview_parts = [crop_filter, f"scale={scale_w//3}:{scale_h//3}"] # Scaled down for fast UI preview
+        vf_preview_str = ",".join(vf_preview_parts)
+        
+        subprocess.run(
+            f'ffmpeg -y -ss {target_time} -i "{video_path}" -vframes 1 -vf "{vf_preview_str}" "{preview_path}"', 
+            shell=True, capture_output=True
+        )
+        
+        if os.path.exists(preview_path):
+            st.image(preview_path, use_container_width=True, caption=f"Live Preview Format: {output_format}")
+            
         if st.button("❌ Remove / Change Video", use_container_width=True):
             os.remove(video_path)
             if os.path.exists(preview_path):
@@ -126,25 +151,6 @@ with col_left:
             st.rerun()
 
 with col_right:
-    # --- OUTPUT FORMAT SECTION ---
-    st.markdown("### 📐 Output Format")
-    output_format = st.radio(
-        "Select Format", 
-        ["9:16 Vertical", "16:9 Landscape", "1:1 Square"], 
-        horizontal=True, 
-        label_visibility="collapsed"
-    )
-    
-    # Map output format to dimensions
-    if "9:16" in output_format:
-        scale_w, scale_h, preview_w, preview_h = 1080, 1920, 540, 960
-    elif "16:9" in output_format:
-        scale_w, scale_h, preview_w, preview_h = 1920, 1080, 960, 540
-    else:
-        scale_w, scale_h, preview_w, preview_h = 1080, 1080, 720, 720
-
-    st.markdown("---")
-
     # --- CLIP DURATION / PROCESSING SETUP ---
     st.markdown("### ⚙️ Clip Duration & Mode")
     if os.path.exists(video_path):
@@ -166,7 +172,7 @@ with col_right:
 
     st.markdown("---")
 
-    # --- CAPTION STYLE (New Grid UI Placeholder + Original Subtitle Backup) ---
+    # --- CAPTION STYLE ---
     st.markdown("### 🎨 Caption Style")
     caption_style_options = [
         "None", "Subtle Gray", "Shadow Mint", "Subtle Cyan", "Stamp Red", 
@@ -177,7 +183,6 @@ with col_right:
     ]
     selected_caption_style = st.selectbox("Select Caption Preset", caption_style_options, index=0)
 
-    # Active backup Subtitle Setting for robust rendering compatibility
     with st.expander("Advanced Subtitle Settings (Active Backend)"):
         enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
         s_col1, s_col2 = st.columns(2)
@@ -250,15 +255,11 @@ if os.path.exists(video_path) and render_clicked:
             cropped_file = os.path.join(DOWNLOAD_DIR, f"cropped_{clip_num}.mp4")
             final_file = os.path.join(DOWNLOAD_DIR, f"final_short_{clip_num}.mp4")
             
-            render_vf_parts = []
+            render_vf_parts = [crop_filter]
             if enable_face_tracking:
                 f_x = detect_face_center(video_path, start_sec)
-                if f_x:
-                    render_vf_parts.append(f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0")
-                else:
-                    render_vf_parts.append(f"crop=ih*{scale_w}/{scale_h}:ih")
-            else:
-                render_vf_parts.append(f"crop=ih*{scale_w}/{scale_h}:ih")
+                if f_x and "9:16" in output_format:
+                    render_vf_parts = [f"crop=ih*{scale_w}/{scale_h}:ih:clamp(x={f_x}-ih*{scale_w}/{scale_h*2}\\,0\\,in_w-ih*{scale_w}/{scale_h}):0"]
 
             if enable_flip:
                 render_vf_parts.append("hflip")
