@@ -377,27 +377,37 @@ with col_left:
             st.session_state.generated_clips = []
             st.rerun()
 
-        # --- DIRECT BATCH DOWNLOAD BUTTON (SHOWS AUTOMATICALLY AFTER RENDERING) ---
-        if st.session_state.generated_clips:
-            st.markdown("---")
-            st.markdown("### 📥 Batch Download Ready")
-            zip_path = os.path.join(DOWNLOAD_DIR, "all_shorts_clips.zip")
-            
+        # --- PERMANENT BATCH DOWNLOAD BUTTON (ALWAYS VISIBLE, ACTIVATES AFTER RENDERING) ---
+        st.markdown("---")
+        st.markdown("### 📥 Batch Download")
+        
+        has_clips = len(st.session_state.generated_clips) > 0
+        zip_path = os.path.join(DOWNLOAD_DIR, "all_shorts_clips.zip")
+        
+        zip_data = b""
+        if has_clips:
             with zipfile.ZipFile(zip_path, 'w') as zipf:
                 for c_num, f_path in st.session_state.generated_clips:
                     if os.path.exists(f_path):
                         zipf.write(f_path, arcname=os.path.basename(f_path))
-            
-            with open(zip_path, "rb") as fp:
-                st.download_button(
-                    label="📥 Download All Shorts (ZIP)",
-                    data=fp,
-                    file_name="AI_Clipping_Studio_Batch.zip",
-                    mime="application/zip",
-                    type="primary",
-                    use_container_width=True
-                )
+            if os.path.exists(zip_path):
+                with open(zip_path, "rb") as fp:
+                    zip_data = fp.read()
+
+        st.download_button(
+            label="📥 Download All Shorts (ZIP)",
+            data=zip_data if has_clips else b"",
+            file_name="AI_Clipping_Studio_Batch.zip",
+            mime="application/zip",
+            type="primary",
+            use_container_width=True,
+            disabled=not has_clips
+        )
+        
+        if has_clips:
             st.success("Download Done! All clips successfully packaged.")
+        else:
+            st.info("Pehle Shorts render karein, phir yeh download button active ho jaye ga.")
 
 # --- RENDERING & EXPORT GALLERY ---
 if os.path.exists(video_path) and render_clicked:
