@@ -179,7 +179,7 @@ with col_right:
                 s_dur = st.text_input(f"Clip {i+1} Duration", value="28", key=f"dur_{i}")
             clip_ranges.append((s_start, s_dur))
     else:
-        target_clip_len = st.slider("Target Duration (Sec)", min_value=15, max_value=45, value=30)
+        target_clip_len = st.selectbox("Target Duration (Sec)", [10, 20, 30, 40, 50, 60, 70, 80, 90, 100], index=2)
         st.info("AI will automatically split video into smart clips.")
 
     st.markdown("---")
@@ -416,7 +416,9 @@ if os.path.exists(video_path) and render_clicked:
                 t_start, t_dur = idx * 30, 28
             tasks.append((idx + 1, t_start, t_dur))
     else:
-        tasks = [(1, 0, 30), (2, 35, 30), (3, 70, 30)]
+        # Auto-Split AI logic based on selected target duration dropdown
+        # Creating multiple tasks across the video duration if needed, or default segments based on target_clip_len
+        tasks = [(1, 0, target_clip_len), (2, target_clip_len + 5, target_clip_len), (3, (target_clip_len * 2) + 10, target_clip_len)]
 
     model = whisper.load_model("base") if enable_subs else None
     st.session_state.generated_clips = []
