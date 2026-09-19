@@ -405,9 +405,9 @@ with col_left:
         )
         
         if has_clips:
-            st.success("Download Done! All clips successfully packaged.")
+            st.success("ZIP file Ready to Download")
         else:
-            st.info("Pehle Shorts render karein, phir yeh download button active ho jaye ga.")
+            st.info("Render 1 or more clips")
 
 # --- RENDERING & EXPORT GALLERY ---
 if os.path.exists(video_path) and render_clicked:
