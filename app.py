@@ -5,6 +5,7 @@ import os
 import shutil
 import textwrap
 import cv2
+import zipfile
 from PIL import Image, ImageDraw
 from fonts import get_pro_font, get_font_family
 from effects_engine import get_filter_ffmpeg_string, get_style_effect_ffmpeg_string
@@ -34,6 +35,9 @@ if 'manual_offset_x' not in st.session_state:
 
 if 'manual_offset_y' not in st.session_state:
     st.session_state.manual_offset_y = 50
+
+if 'generated_clips' not in st.session_state:
+    st.session_state.generated_clips = []
 
 DOWNLOAD_DIR = "downloads"
 if not os.path.exists(DOWNLOAD_DIR):
@@ -273,6 +277,7 @@ with col_left:
             if uploaded_file is not None:
                 with open(video_path, "wb") as f:
                     f.write(uploaded_file.getbuffer())
+                st.session_state.generated_clips = []
                 st.success("File Uploaded & Saved!")
                 st.rerun()
     else:
@@ -291,12 +296,11 @@ with col_left:
         else:
             f_x_expr = f"in_w * {st.session_state.manual_offset_x / 100.0}"
 
-        # To allow vertical movement, let's make crop height slightly flexible or proportional
         f_y_expr = f"in_h * {st.session_state.manual_offset_y / 100.0}"
 
         if "9:16" in output_format:
             crop_w = f"ih*{scale_w}/{scale_h}"
-            crop_h = "ih*0.95" # Slightly less than ih to allow vertical up/down movement room
+            crop_h = "ih*0.95"
             crop_x = f"clip({f_x_expr}-{crop_w}/2\\, 0\\, in_w-{crop_w})"
             crop_y = f"clip({f_y_expr}-{crop_h}/2\\, 0\\, in_h-{crop_h})"
             vf_preview_parts = [f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}"]
@@ -370,7 +374,36 @@ with col_left:
             os.remove(video_path)
             if os.path.exists(dynamic_preview_path):
                 os.remove(dynamic_preview_path)
+            st.session_state.generated_clips = []
             st.rerun()
+
+        # --- BATCH DOWNLOAD BUTTON & PROGRESS (BELOW REMOVE/CHANGE VIDEO) ---
+        if st.session_state.generated_clips:
+            st.markdown("---")
+            st.markdown("### 📥 Batch Download")
+            if st.button("📥 Download All Shorts (Batch)", use_container_width=True, type="primary"):
+                zip_path = os.path.join(DOWNLOAD_DIR, "all_shorts_clips.zip")
+                total_clips = len(st.session_state.generated_clips)
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                with zipfile.ZipFile(zip_path, 'w') as zipf:
+                    for idx, (c_num, f_path) in enumerate(st.session_state.generated_clips):
+                        if os.path.exists(f_path):
+                            status_text.text(f"Downloading clips progress: {idx+1}/{total_clips}")
+                            zipf.write(f_path, arcname=os.path.basename(f_path))
+                            progress_bar.progress((idx + 1) / total_clips)
+                
+                status_text.text("Download Done! All clips successfully packaged.")
+                with open(zip_path, "rb") as fp:
+                    st.download_button(
+                        label="📥 Click here to save ZIP file",
+                        data=fp,
+                        file_name="AI_Clipping_Studio_Batch.zip",
+                        mime="application/zip",
+                        type="primary",
+                        use_container_width=True
+                    )
 
 # --- RENDERING & EXPORT GALLERY ---
 if os.path.exists(video_path) and render_clicked:
@@ -386,7 +419,7 @@ if os.path.exists(video_path) and render_clicked:
         tasks = [(1, 0, 30), (2, 35, 30), (3, 70, 30)]
 
     model = whisper.load_model("base") if enable_subs else None
-    generated_clips = []
+    st.session_state.generated_clips = []
 
     with st.spinner("Processing High-Quality Professional Shorts (Fast Speed)..."):
         for clip_num, start_sec, duration_sec in tasks:
@@ -512,11 +545,12 @@ if os.path.exists(video_path) and render_clicked:
                     os.remove(final_file)
                 os.rename(cropped_file, final_file)
 
-            generated_clips.append((clip_num, final_file))
+            st.session_state.generated_clips.append((clip_num, final_file))
 
+if st.session_state.generated_clips:
     st.subheader("🎉 Shorts Export Gallery")
     cols = st.columns(3)
-    for idx, (c_num, filepath) in enumerate(generated_clips):
+    for idx, (c_num, filepath) in enumerate(st.session_state.generated_clips):
         col_target = cols[idx % 3]
         with col_target:
             st.markdown(f"**🎬 Short Clip {c_num}**")
