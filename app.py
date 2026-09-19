@@ -118,8 +118,8 @@ with col_right:
 
     st.markdown("---")
 
-    # --- 2. SUBTITLE / CAPTION SETTING ---
-    st.markdown("### ✍️ Subtitle Setting")
+    # --- 2. SUBTITLE SETTING ---
+    st.markdown("### Subtitle")
     enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
     
     style_preset = st.selectbox("Subtitle Preset", [
@@ -164,12 +164,12 @@ with col_right:
 
     st.markdown("---")
 
-    # --- 3. PROCESSING MODE SELECTION ---
-    st.markdown("### ⚙️ Processing Mode Selection")
-    clip_mode = st.radio("Processing Mode Selection:", ("Manual Timestamps (Precise)", "Auto-Split AI (Smart Clips)"), label_visibility="collapsed")
+    # --- 3. CLIPPING MODE ---
+    st.markdown("### Clipping Mode")
+    clip_mode = st.selectbox("Clipping Mode", ["Manual", "Auto-Split AI"], label_visibility="collapsed")
     
     clip_ranges = []
-    if clip_mode == "Manual Timestamps (Precise)":
+    if clip_mode == "Manual":
         num_clips = st.number_input("Short Clips Quantity", min_value=1, max_value=10, value=1)
         for i in range(int(num_clips)):
             c1, c2 = st.columns(2)
@@ -281,8 +281,6 @@ with col_left:
                 st.success("File Uploaded & Saved!")
                 st.rerun()
     else:
-        st.markdown("### 🎬 Loaded Video Preview")
-        
         target_time = "0"
         vf_preview_parts = []
         
@@ -365,7 +363,6 @@ with col_left:
                 st.image(img, width=preview_scale_w, caption=f"Live Preview | {output_format}")
 
         with ctrl_col:
-            st.markdown("#### 🎛️ Framing Controls")
             st.checkbox("Smart AI Face Tracking", key="enable_face_tracking")
             st.slider("Horizontal (Left/Right)", min_value=0, max_value=100, key="manual_offset_x")
             st.slider("Vertical (Up/Down)", min_value=0, max_value=100, key="manual_offset_y")
@@ -377,9 +374,8 @@ with col_left:
             st.session_state.generated_clips = []
             st.rerun()
 
-        # --- PERMANENT BATCH DOWNLOAD BUTTON (ALWAYS VISIBLE, ACTIVATES AFTER RENDERING) ---
+        # --- BATCH DOWNLOAD BUTTON (WITHOUT HEADER) ---
         st.markdown("---")
-        st.markdown("### 📥 Batch Download")
         
         has_clips = len(st.session_state.generated_clips) > 0
         zip_path = os.path.join(DOWNLOAD_DIR, "all_shorts_clips.zip")
@@ -412,7 +408,7 @@ with col_left:
 # --- RENDERING & EXPORT GALLERY ---
 if os.path.exists(video_path) and render_clicked:
     tasks = []
-    if clip_mode == "Manual Timestamps (Precise)" and 'clip_ranges' in locals():
+    if clip_mode == "Manual" and 'clip_ranges' in locals():
         for idx, (s_st, s_du) in enumerate(clip_ranges):
             try:
                 t_start, t_dur = int(s_st), int(s_du)
@@ -552,11 +548,10 @@ if os.path.exists(video_path) and render_clicked:
 
             st.session_state.generated_clips.append((clip_num, final_file))
 
-    # Page refresh trigger taake download button foran active ho jaye
     st.rerun()
 
 if st.session_state.generated_clips:
-    st.subheader("🎉 Shorts Export Gallery")
+    st.subheader("Export Gallery")
     cols = st.columns(3)
     for idx, (c_num, filepath) in enumerate(st.session_state.generated_clips):
         col_target = cols[idx % 3]
