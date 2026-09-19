@@ -377,33 +377,27 @@ with col_left:
             st.session_state.generated_clips = []
             st.rerun()
 
-        # --- BATCH DOWNLOAD BUTTON & PROGRESS (BELOW REMOVE/CHANGE VIDEO) ---
+        # --- DIRECT BATCH DOWNLOAD BUTTON (SHOWS AUTOMATICALLY AFTER RENDERING) ---
         if st.session_state.generated_clips:
             st.markdown("---")
-            st.markdown("### 📥 Batch Download")
-            if st.button("📥 Download All Shorts (Batch)", use_container_width=True, type="primary"):
-                zip_path = os.path.join(DOWNLOAD_DIR, "all_shorts_clips.zip")
-                total_clips = len(st.session_state.generated_clips)
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-                
-                with zipfile.ZipFile(zip_path, 'w') as zipf:
-                    for idx, (c_num, f_path) in enumerate(st.session_state.generated_clips):
-                        if os.path.exists(f_path):
-                            status_text.text(f"Downloading clips progress: {idx+1}/{total_clips}")
-                            zipf.write(f_path, arcname=os.path.basename(f_path))
-                            progress_bar.progress((idx + 1) / total_clips)
-                
-                status_text.text("Download Done! All clips successfully packaged.")
-                with open(zip_path, "rb") as fp:
-                    st.download_button(
-                        label="📥 Click here to save ZIP file",
-                        data=fp,
-                        file_name="AI_Clipping_Studio_Batch.zip",
-                        mime="application/zip",
-                        type="primary",
-                        use_container_width=True
-                    )
+            st.markdown("### 📥 Batch Download Ready")
+            zip_path = os.path.join(DOWNLOAD_DIR, "all_shorts_clips.zip")
+            
+            with zipfile.ZipFile(zip_path, 'w') as zipf:
+                for c_num, f_path in st.session_state.generated_clips:
+                    if os.path.exists(f_path):
+                        zipf.write(f_path, arcname=os.path.basename(f_path))
+            
+            with open(zip_path, "rb") as fp:
+                st.download_button(
+                    label="📥 Download All Shorts (ZIP)",
+                    data=fp,
+                    file_name="AI_Clipping_Studio_Batch.zip",
+                    mime="application/zip",
+                    type="primary",
+                    use_container_width=True
+                )
+            st.success("Download Done! All clips successfully packaged.")
 
 # --- RENDERING & EXPORT GALLERY ---
 if os.path.exists(video_path) and render_clicked:
@@ -422,7 +416,8 @@ if os.path.exists(video_path) and render_clicked:
     st.session_state.generated_clips = []
 
     with st.spinner("Processing High-Quality Professional Shorts (Fast Speed)..."):
-        for clip_num, start_sec, duration_sec in tasks:
+        total_tasks = len(tasks)
+        for i, (clip_num, start_sec, duration_sec) in enumerate(tasks):
             cropped_file = os.path.join(DOWNLOAD_DIR, f"cropped_{clip_num}.mp4")
             final_file = os.path.join(DOWNLOAD_DIR, f"final_short_{clip_num}.mp4")
             
@@ -510,8 +505,8 @@ if os.path.exists(video_path) and render_clicked:
                     for segment in result['segments']:
                         if 'words' in segment:
                             words = segment['words']
-                            for i in range(0, len(words), words_per_line):
-                                chunk = words[i:i + words_per_line]
+                            for j in range(0, len(words), words_per_line):
+                                chunk = words[j:j + words_per_line]
                                 start_t = chunk[0]['start']
                                 end_t = chunk[-1]['end']
                                 raw_str = " ".join([w['word'].strip() for w in chunk]).upper()
