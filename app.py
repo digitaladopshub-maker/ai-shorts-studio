@@ -166,7 +166,7 @@ with col_right:
     
     clip_ranges = []
     if clip_mode == "Manual Timestamps (Precise)":
-        num_clips = st.number_input("Short Clips Quantity", min_value=1, max_value=5, value=1)
+        num_clips = st.number_input("Short Clips Quantity", min_value=1, max_value=10, value=1)
         for i in range(int(num_clips)):
             c1, c2 = st.columns(2)
             with c1:
@@ -296,7 +296,7 @@ with col_left:
 
         if "9:16" in output_format:
             crop_w = f"ih*{scale_w}/{scale_h}"
-            crop_h = "ih*0.95"  # Slightly less than ih to allow vertical up/down movement room
+            crop_h = "ih*0.95" # Slightly less than ih to allow vertical up/down movement room
             crop_x = f"clip({f_x_expr}-{crop_w}/2\\, 0\\, in_w-{crop_w})"
             crop_y = f"clip({f_y_expr}-{crop_h}/2\\, 0\\, in_h-{crop_h})"
             vf_preview_parts = [f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}"]
