@@ -552,6 +552,9 @@ if os.path.exists(video_path) and render_clicked:
 
             st.session_state.generated_clips.append((clip_num, final_file))
 
+    # Page refresh trigger taake download button foran active ho jaye
+    st.rerun()
+
 if st.session_state.generated_clips:
     st.subheader("🎉 Shorts Export Gallery")
     cols = st.columns(3)
