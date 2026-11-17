@@ -41,6 +41,9 @@ def render_clipping_page():
     if 'generated_clips' not in st.session_state:
         st.session_state.generated_clips = []
 
+    if 'podcast_mode' not in st.session_state:
+        st.session_state.podcast_mode = False
+
     DOWNLOAD_DIR = "downloads"
     if not os.path.exists(DOWNLOAD_DIR):
         os.makedirs(DOWNLOAD_DIR, exist_ok=True)
@@ -215,19 +218,6 @@ def render_clipping_page():
                     bg_vol_pct = st.slider("Background Music Volume (%)", min_value=0, max_value=100, value=15, step=1)
                     bg_vol = bg_vol_pct / 100.0
 
-        # Keep all framing controls in the settings column, never beside or over
-        # the portrait preview. Tracking runs automatically during preview/render.
-        with st.expander("🎯 Smart Framing Settings", expanded=False):
-            st.success("Smart Face Tracking: AUTOMATIC ON")
-            st.caption(
-                "Face aur possible active speaker tracking background mein automatically kaam karti hai. "
-                "Face detect na ho ya tracking uncertain ho to safe centre framing use hoti hai."
-            )
-            st.markdown("**Advanced fallback framing**")
-            st.caption("Yeh controls sirf fallback crop position adjust karte hain; automatic tracking ko band nahi karte.")
-            st.slider("Horizontal fallback", min_value=0, max_value=100, key="manual_offset_x")
-            st.slider("Vertical fallback", min_value=0, max_value=100, key="manual_offset_y")
-
         render_clicked = st.button("🚀 Render Shorts Batch Now", type="primary", use_container_width=True)
 
     with col_left:
@@ -285,10 +275,13 @@ def render_clipping_page():
             src_h = int(cap_meta.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
             cap_meta.release()
             if "9:16" in output_format and src_w > 0 and src_h > 0:
-                preview_track, preview_speaker_info = sample_active_face_track(
-                    video_path, 0, 2.4, sample_interval=0.6, max_width=480
-                )
-                if not preview_track:
+                if st.session_state.podcast_mode:
+                    preview_track, preview_speaker_info = sample_active_face_track(
+                        video_path, 0, 2.4, sample_interval=0.6, max_width=480
+                    )
+                    if not preview_track:
+                        preview_track = sample_face_track(video_path, 0, 2.4, sample_interval=0.6)
+                else:
                     preview_track = sample_face_track(video_path, 0, 2.4, sample_interval=0.6)
                 if preview_track:
                     face_cx, face_cy = preview_track[0][1], preview_track[0][2]
@@ -323,9 +316,8 @@ def render_clipping_page():
                 shell=True, capture_output=True
             )
 
-            # Preview is intentionally limited to the video image and caption.
-            # Tracking status and fallback controls are placed in the settings
-            # column above, keeping the portrait preview unobstructed.
+            # Preview first; all tracking controls/status live BELOW it so they
+            # never overlap or cover the uploaded video in narrow Streamlit columns.
             if os.path.exists(dynamic_preview_path):
                 img = Image.open(dynamic_preview_path)
                 draw = ImageDraw.Draw(img)
@@ -353,6 +345,31 @@ def render_clipping_page():
                     )
 
                 st.image(img, use_container_width=True, caption=f"Live Preview | {output_format}")
+
+            st.markdown("#### Smart Framing")
+            with st.container(border=True):
+                st.toggle(
+                    "Podcast Mode",
+                    key="podcast_mode",
+                    help="Podcast/interview videos ke liye visible mouth activity se likely active speaker par framing focus karta hai."
+                )
+                if st.session_state.podcast_mode:
+                    st.success("Podcast Mode: ON")
+                    st.caption(
+                        "Multi-face visual activity analysis enabled. Speaker switching ek visual estimate hai; "
+                        "yeh audio diarization ya guaranteed lip-sync identification nahi. Agar faces/speaker ambiguous hon "
+                        "to stable face tracking fallback use hota hai."
+                    )
+                    st.info(
+                        "Is version mein automatic split-screen abhi included nahi hai. "
+                        "Current Podcast Mode single vertical frame mein likely active speaker ko follow karta hai."
+                    )
+                else:
+                    st.caption("Podcast Mode OFF — standard automatic face tracking use ho rahi hai. Existing clipping workflow unchanged.")
+                with st.expander("Advanced fallback framing", expanded=False):
+                    st.caption("Yeh settings sirf tab use hoti hain jab face detect na ho ya tracking uncertain ho.")
+                    st.slider("Horizontal fallback", min_value=0, max_value=100, key="manual_offset_x")
+                    st.slider("Vertical fallback", min_value=0, max_value=100, key="manual_offset_y")
 
             if st.button("❌ Remove / Change Video", use_container_width=True):
                 os.remove(video_path)
@@ -469,12 +486,17 @@ def render_clipping_page():
                 cap_meta.release()
 
                 if "9:16" in output_format and src_w > 0 and src_h > 0:
-                    face_samples, speaker_info = sample_active_face_track(
-                        video_path, start_sec, duration_sec, sample_interval=0.65, max_width=480
-                    )
-                    if not face_samples:
-                        face_samples = sample_face_track(video_path, start_sec, duration_sec,
-                                                         sample_interval=0.65, max_width=480)
+                    if st.session_state.podcast_mode:
+                        face_samples, speaker_info = sample_active_face_track(
+                            video_path, start_sec, duration_sec, sample_interval=0.65, max_width=480
+                        )
+                        if not face_samples:
+                            face_samples = sample_face_track(video_path, start_sec, duration_sec,
+                                                             sample_interval=0.65, max_width=480)
+                    else:
+                        face_samples = sample_face_track(
+                            video_path, start_sec, duration_sec, sample_interval=0.65, max_width=480
+                        )
                     crop_w = "min(iw\\,ih*9/16)"
                     crop_h = "min(ih\\,iw*16/9)"
                     fallback_cx = src_w * (st.session_state.manual_offset_x / 100.0)

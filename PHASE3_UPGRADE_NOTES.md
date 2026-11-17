@@ -16,8 +16,3 @@
 
 ## Dependencies
 No new package was added. NumPy is installed as an OpenCV dependency.
-
-## Preview layout correction
-- Moved Smart Face Tracking status, its explanation, and fallback sliders into a collapsed `Smart Framing Settings` expander in the right-hand settings column.
-- The video preview column now contains only the preview image and its caption, preventing framing controls from crowding or visually overlapping the portrait preview.
-- Automatic tracking remains enabled; the fallback sliders only adjust fallback crop positioning.
