@@ -1,49 +1,25 @@
+"""Curated viral subtitle presets used by preview and final ASS rendering."""
+
+# Every preset controls typography and visual treatment internally. The UI only
+# exposes the master preset, caption position, and words-per-line controls.
+SUBTITLE_PRESETS = {
+    "Hormozi Bold": {"font": "Impact", "size": 58, "primary": "&H0000FFFF", "text": "#FFFF00", "outline": "#000000", "outline_width": 5, "shadow": 2, "border_style": 1, "bold": True, "italic": False},
+    "TikTok Viral": {"font": "Roboto-Bold", "size": 54, "primary": "&H00FFFFFF", "text": "#FFFFFF", "outline": "#111111", "outline_width": 4, "shadow": 2, "border_style": 1, "bold": True, "italic": False},
+    "MrBeast Impact": {"font": "Impact", "size": 66, "primary": "&H0000D7FF", "text": "#FFD700", "outline": "#101010", "outline_width": 6, "shadow": 3, "border_style": 1, "bold": True, "italic": False},
+    "Podcast Pro": {"font": "Montserrat-VariableFont_wght", "size": 48, "primary": "&H00FFFFFF", "text": "#FFFFFF", "outline": "#171717", "outline_width": 3, "shadow": 1, "border_style": 1, "bold": True, "italic": False},
+    "Minimal Clean": {"font": "Roboto-Bold", "size": 46, "primary": "&H00FFFFFF", "text": "#FFFFFF", "outline": "#222222", "outline_width": 2, "shadow": 1, "border_style": 1, "bold": True, "italic": False},
+    "Neon Pop": {"font": "Montserrat-VariableFont_wght", "size": 56, "primary": "&H00CCFF00", "text": "#00FFCC", "outline": "#321044", "outline_width": 5, "shadow": 3, "border_style": 1, "bold": True, "italic": False},
+    "Cinematic Premium": {"font": "BebasNeue-Regular", "size": 58, "primary": "&H00F2F2F2", "text": "#F2F2F2", "outline": "#171717", "outline_width": 3, "shadow": 2, "border_style": 1, "bold": False, "italic": False},
+    "YouTube Shorts Pro": {"font": "Montserrat-VariableFont_wght", "size": 54, "primary": "&H0000FFFF", "text": "#FFFF00", "outline": "#080808", "outline_width": 5, "shadow": 2, "border_style": 1, "bold": True, "italic": False},
+    "Gaming Energy": {"font": "Impactbrutas", "size": 62, "primary": "&H0000A5FF", "text": "#FF5A00", "outline": "#080808", "outline_width": 6, "shadow": 3, "border_style": 1, "bold": True, "italic": False},
+    "Clean Highlight": {"font": "Interact", "size": 50, "primary": "&H0000E5FF", "text": "#FFE500", "outline": "#161616", "outline_width": 3, "shadow": 1, "border_style": 1, "bold": True, "italic": False},
+}
+
+def get_subtitle_preset_config(style_preset):
+    """Return a copy of the selected preset's complete visual configuration."""
+    return dict(SUBTITLE_PRESETS.get(style_preset, SUBTITLE_PRESETS["Hormozi Bold"]))
+
 def get_subtitle_styling(style_preset):
-    """
-    Returns subtitle styling configuration based on the selected style preset.
-    Returns: (text_color, outline_color, has_box, anim_type, ass_color_hex)
-    """
-    preset_lower = style_preset.lower()
-    
-    if "hormozi" in preset_lower:
-        return ("#FFFF00", "#000000", False, "Pop-In Scale", "&H0000FFFF")
-    elif "border pop-up" in preset_lower:
-        return ("#FFFFFF", "#FF0000", True, "Pop-In Scale", "&H0000FFFF")
-    elif "karaoke highlight" in preset_lower:
-        return ("#FFD700", "#000080", False, "Pop-In Scale", "&H0000D7FF")
-    elif "power word scale" in preset_lower:
-        return ("#00FFFF", "#000000", False, "Pop-In Scale", "&H00FFFF00")
-    elif "glow & shine" in preset_lower:
-        return ("#FF69B4", "#4B0082", False, "Fade In", "&H00B469FF")
-    elif "minimal subtitle block" in preset_lower:
-        return ("#FFFFFF", "#333333", True, "Standard", "&H00FFFFFF")
-    elif "apple style minimal" in preset_lower:
-        return ("#F5F5F5", "#111111", False, "Fade In", "&H00F5F5F5")
-    elif "gradient premium stack" in preset_lower:
-        return ("#00CED1", "#191970", False, "Pop-In Scale", "&H00D1CE00")
-    elif "real estate pro" in preset_lower:
-        return ("#FFD700", "#1C1C1C", True, "Standard", "&H0000D7FF")
-    elif "3d viral text" in preset_lower:
-        return ("#FF4500", "#000000", False, "Pop-In Scale", "&H000045FF")
-    elif "multiple word slide up" in preset_lower:
-        return ("#ADFF2F", "#006400", False, "Slide Up", "&H002FFFAD")
-    elif "typewriter effect" in preset_lower:
-        return ("#00FF7F", "#2F4F4F", False, "Standard", "&H007FFF00")
-    elif "flicker text" in preset_lower:
-        return ("#FF1493", "#000000", False, "Flicker", "&H009314FF")
-    elif "wave in" in preset_lower or "bounce" in preset_lower:
-        return ("#00BFFF", "#00008B", False, "Bounce", "&H00FFBF00")
-    elif "blur fade in" in preset_lower:
-        return ("#E0FFFF", "#2F4F4F", False, "Fade In", "&H00FFE0E0")
-    elif "auto-emoji pop" in preset_lower:
-        return ("#FFD700", "#FF4500", False, "Pop-In Scale", "&H0000D7FF")
-    elif "tiktok classic style" in preset_lower:
-        return ("#FFFFFF", "#000000", True, "Standard", "&H00FFFFFF")
-    elif "sound effects bracket" in preset_lower:
-        return ("#00FF00", "#8B0000", False, "Standard", "&H0000FF00")
-    elif "capcut auto lyric template" in preset_lower:
-        return ("#FF8C00", "#FFFFFF", False, "Pop-In Scale", "&H00008CFF")
-    elif "cyberpunk neon" in preset_lower:
-        return ("#00FFCC", "#FF00FF", True, "Pop-In Scale", "&H00CCFF00")
-    else:
-        return ("#FFFF00", "#000000", False, "Pop-In Scale", "&H0000FFFF")
+    """Backward-compatible styling tuple: text, outline, box, animation, ASS color."""
+    cfg = get_subtitle_preset_config(style_preset)
+    return (cfg["text"], cfg["outline"], False, "Pop-In Scale", cfg["primary"])

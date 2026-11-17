@@ -9,7 +9,7 @@ import zipfile
 from PIL import Image, ImageDraw
 from fonts import get_pro_font, get_font_family
 from effects_engine import get_filter_ffmpeg_string, get_style_effect_ffmpeg_string
-from subtitle_engine import get_subtitle_styling
+from subtitle_engine import get_subtitle_styling, get_subtitle_preset_config
 from face_tracker import sample_face_track, build_crop_expressions
 from multi_face_tracker import sample_active_face_track
 from ai_engine.viral_detector import rank_transcript_segments
@@ -105,42 +105,19 @@ def render_clipping_page():
         st.markdown("### Subtitle")
         enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
 
-        style_preset = st.selectbox("Subtitle Preset", [
-            "The Alex Hormozi Style", "Border Pop-Up", "Karaoke Highlight", "The Power Word Scale", 
-            "Glow & Shine Effect", "The Minimal Subtitle Block", "Apple Style Minimal", "The Gradient Premium Stack", 
-            "Real Estate Pro", "The 3D Viral Text", "Multiple Word Slide Up", "Typewriter Effect", 
-            "Flicker Text", "Wave In / Bounce", "Blur Fade In", "Auto-Emoji Pop", 
-            "TikTok Classic Style", "Sound Effects Bracket", "CapCut Auto Lyric Template", "The Cyberpunk Neon"
-        ], index=0)
+        style_preset = st.selectbox("Viral Subtitle Presets", [
+            "Hormozi Bold", "TikTok Viral", "MrBeast Impact", "Podcast Pro",
+            "Minimal Clean", "Neon Pop", "Cinematic Premium", "YouTube Shorts Pro",
+            "Gaming Energy", "Clean Highlight"
+        ], index=0, help="Har preset apna font, size, colors aur outline automatically set karta hai.")
+        subtitle_config = get_subtitle_preset_config(style_preset)
+        font_choice = subtitle_config["font"]
+        font_size = subtitle_config["size"]
 
         s_col1, s_col2 = st.columns(2)
         with s_col1:
-            font_choice = st.selectbox("Font", [
-                "AntonioZull-Brush",
-                "BebasNeue-Regular",
-                "Impact Club",
-                "Impact",
-                "Impactbrutas",
-                "IMPACTED",
-                "Impacted2.0",
-                "Impact-Extravagant",
-                "Interact",
-                "Montserrat-Italic-VariableFont_wght",
-                "Montserrat-VariableFont_wght",
-                "Popping-Cute",
-                "Roboto-Bold",
-                "Roboto-Regular",
-                "San Antonio Charros_personal_use_only"
-            ], index=2)
-        with s_col2:
             caption_align = st.selectbox("Position", ["Bottom (Safe Zone)", "Middle-Center", "Top (Safe Zone)"], index=0)
-
-        s_col3, s_col4 = st.columns(2)
-        with s_col3:
-            font_size_option = st.selectbox("Font Size", ["Small (18px)", "Medium (24px - Rec)", "Large (32px)", "Extra Large (40px)"], index=1)
-            font_size_map = {"Small (18px)": 18, "Medium (24px - Rec)": 24, "Large (32px)": 32, "Extra Large (40px)": 40}
-            font_size = font_size_map[font_size_option]
-        with s_col4:
+        with s_col2:
             words_per_line_option = st.selectbox("Words Per Line", ["1 Word", "2 Words (Recommended)", "3 Words", "4 Words", "5 Words"], index=1)
             wpl_map = {"1 Word": 1, "2 Words (Recommended)": 2, "3 Words": 3, "4 Words": 4, "5 Words": 5}
             words_per_line = wpl_map[words_per_line_option]
@@ -330,7 +307,7 @@ def render_clipping_page():
                     wrap_width = max(8, int(16 - (font_size / 3)))
                     wrapped_lines = textwrap.wrap(raw_text, width=wrap_width)
                     wrapped_text = "\n".join(wrapped_lines)
-                    preview_calc_size = int(font_size * (preview_scale_h / scale_h) * 2.2)
+                    preview_calc_size = int(font_size * (preview_scale_h / scale_h))
                     font = get_pro_font(font_choice, preview_calc_size)
                     if "Top" in caption_align:
                         y_pos = int(h * 0.18)
@@ -341,7 +318,7 @@ def render_clipping_page():
                     x_pos = int(w / 2)
                     draw.multiline_text(
                         (x_pos, y_pos), wrapped_text, font=font, fill=text_color,
-                        anchor="mm", align="center", stroke_width=max(1, int(preview_calc_size * 0.08)), stroke_fill=outline_color
+                        anchor="mm", align="center", stroke_width=max(1, int(subtitle_config["outline_width"] * (preview_scale_h / scale_h) * 2.2)), stroke_fill=outline_color
                     )
 
                 st.image(img, use_container_width=True, caption=f"Live Preview | {output_format}")
@@ -540,6 +517,7 @@ def render_clipping_page():
 
                     text_col, _, _, _, ass_color = get_subtitle_styling(style_preset)
                     ass_font_name = get_font_family(font_choice)
+                    subtitle_config = get_subtitle_preset_config(style_preset)
 
                     result = model.transcribe(whisper_audio_path if os.path.exists(whisper_audio_path) else cropped_file, word_timestamps=True)
                     ass_file = os.path.join(DOWNLOAD_DIR, f"subs_{clip_num}.ass")
@@ -549,9 +527,14 @@ def render_clipping_page():
                         f.write("[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
 
                         margin_v_val = int(scale_h * 0.12) if "Bottom" in caption_align else (int(scale_h * 0.1) if "Top" in caption_align else int(scale_h * 0.5))
-                        render_ass_fontsize = int(font_size * (scale_h / 480) * 1.5)
+                        render_ass_fontsize = int(subtitle_config["size"] * (scale_h / 1920))
+                        ass_bold = -1 if subtitle_config["bold"] else 0
+                        ass_italic = -1 if subtitle_config["italic"] else 0
+                        outline_color_ass = "&H00000000"
+                        outline_width = subtitle_config["outline_width"]
+                        shadow_width = subtitle_config["shadow"]
 
-                        f.write(f"Style: Default,{ass_font_name},{render_ass_fontsize},{ass_color},&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},160,160,{margin_v_val},1\n\n")
+                        f.write(f"Style: Default,{ass_font_name},{render_ass_fontsize},{ass_color},&H00000000,{outline_color_ass},&H80000000,{ass_bold},{ass_italic},0,0,100,100,0,0,{subtitle_config['border_style']},{outline_width},{shadow_width},{align_val},160,160,{margin_v_val},1\n\n")
                         f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
 
                         for segment in result['segments']:
