@@ -346,30 +346,7 @@ def render_clipping_page():
 
                 st.image(img, use_container_width=True, caption=f"Live Preview | {output_format}")
 
-            st.markdown("#### Smart Framing")
-            with st.container(border=True):
-                st.toggle(
-                    "Podcast Mode",
-                    key="podcast_mode",
-                    help="Podcast/interview videos ke liye visible mouth activity se likely active speaker par framing focus karta hai."
-                )
-                if st.session_state.podcast_mode:
-                    st.success("Podcast Mode: ON")
-                    st.caption(
-                        "Multi-face visual activity analysis enabled. Speaker switching ek visual estimate hai; "
-                        "yeh audio diarization ya guaranteed lip-sync identification nahi. Agar faces/speaker ambiguous hon "
-                        "to stable face tracking fallback use hota hai."
-                    )
-                    st.info(
-                        "Is version mein automatic split-screen abhi included nahi hai. "
-                        "Current Podcast Mode single vertical frame mein likely active speaker ko follow karta hai."
-                    )
-                else:
-                    st.caption("Podcast Mode OFF — standard automatic face tracking use ho rahi hai. Existing clipping workflow unchanged.")
-                with st.expander("Advanced fallback framing", expanded=False):
-                    st.caption("Yeh settings sirf tab use hoti hain jab face detect na ho ya tracking uncertain ho.")
-                    st.slider("Horizontal fallback", min_value=0, max_value=100, key="manual_offset_x")
-                    st.slider("Vertical fallback", min_value=0, max_value=100, key="manual_offset_y")
+            st.toggle("Podcast Mode", key="podcast_mode")
 
             if st.button("❌ Remove / Change Video", use_container_width=True):
                 os.remove(video_path)
