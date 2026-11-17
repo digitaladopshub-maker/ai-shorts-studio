@@ -1,6 +1,7 @@
 import streamlit as st
 import whisper
 import subprocess
+import sys
 import os
 import shutil
 import textwrap
@@ -209,29 +210,47 @@ def render_clipping_page():
                         if os.path.exists(video_path):
                             os.remove(video_path)
 
-                        dl_cmd = (
-                            f'yt-dlp --no-check-certificates --geo-bypass --remote-components ejs:npm '
-                            f'--extractor-args "youtube:player_client=web,mweb" '
-                            f'-f "bestvideo[ext=mp4]+bestaudio[ext=mp4]/best[ext=mp4]/best" '
-                            f'-o "{video_path}" "{video_url}"'
+                        # Use the yt-dlp module from the active Streamlit Python
+                        # environment, and explicitly register Node.js for YouTube's
+                        # JavaScript challenge / signature solving.
+                        common_args = [
+                            sys.executable, "-m", "yt_dlp",
+                            "--no-check-certificates", "--geo-bypass",
+                            "--js-runtimes", "node",
+                            "--remote-components", "ejs:npm",
+                            "--no-warnings",
+                            "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+                            "-o", video_path,
+                        ]
+                        result = subprocess.run(
+                            common_args + [video_url], capture_output=True, text=True
                         )
-                        result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
 
                         if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
                             st.success("Video Successfully Downloaded & Saved!")
                             st.rerun()
                         else:
-                            fallback_cmd = f'yt-dlp --no-check-certificates --remote-components ejs:npm --extractor-args "youtube:player_client=ios" -o "{video_path}" "{video_url}"'
-                            subprocess.run(fallback_cmd, shell=True)
+                            # A second YouTube client can help when the default
+                            # player client is temporarily blocked. Keep the same
+                            # JS runtime and EJS challenge solver enabled.
+                            fallback_args = [
+                                sys.executable, "-m", "yt_dlp",
+                                "--no-check-certificates", "--geo-bypass",
+                                "--js-runtimes", "node",
+                                "--remote-components", "ejs:npm",
+                                "--extractor-args", "youtube:player_client=android",
+                                "-o", video_path, video_url,
+                            ]
+                            fallback_result = subprocess.run(
+                                fallback_args, capture_output=True, text=True
+                            )
                             if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
                                 st.success("Video Downloaded via Fallback & Saved!")
                                 st.rerun()
                             else:
                                 st.error("Download failed! Detailed Error:")
-                                if result.stderr:
-                                    st.code(result.stderr[:400])
-                                else:
-                                    st.error("Unknown error occurred during download.")
+                                error_text = (fallback_result.stderr or result.stderr or "Unknown error occurred during download.")
+                                st.code(error_text[-1800:])
 
             elif option == "Upload MP4 File":
                 uploaded_file = st.file_uploader("Upload MP4 File", type=["mp4"])
