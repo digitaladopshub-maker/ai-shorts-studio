@@ -19,6 +19,7 @@ ASSET_DIR.mkdir(exist_ok=True)
 
 CANVAS_W, CANVAS_H = 1280, 720
 OVERLAY_FPS = 5
+LOG_PATH = STREAM_DIR / "ffmpeg_live.log"
 
 
 def _alive(proc):
@@ -122,30 +123,55 @@ def _compose_overlay(layers):
 
 
 def _overlay_writer(proc, stop_event):
-    """Feed transparent RGBA overlay frames to FFmpeg; reads updated layer state each frame."""
+    """Feed complete transparent RGBA frames to FFmpeg, even when pipe writes are partial."""
     frame_bytes = CANVAS_W * CANVAS_H * 4
     interval = 1.0 / OVERLAY_FPS
     try:
         while not stop_event.is_set() and proc.poll() is None:
             started = time.time()
-            layers = _load_layers()
-            frame = _compose_overlay(layers)
+            frame = _compose_overlay(_load_layers())
             raw = frame.tobytes()
             if len(raw) != frame_bytes:
-                continue
-            proc.stdin.write(raw)
-            proc.stdin.flush()
+                raise ValueError(f"Overlay frame size mismatch: {len(raw)} != {frame_bytes}")
+            # Unbuffered pipe writes can be partial for frames larger than PIPE_BUF.
+            # Write the entire frame before sending the next one or rawvideo becomes misaligned.
+            view = memoryview(raw)
+            while view and not stop_event.is_set() and proc.poll() is None:
+                written = proc.stdin.write(view)
+                if written is None or written <= 0:
+                    raise BrokenPipeError("FFmpeg overlay input pipe closed")
+                view = view[written:]
             delay = interval - (time.time() - started)
             if delay > 0:
                 stop_event.wait(delay)
-    except (BrokenPipeError, OSError, ValueError):
-        pass
+    except (BrokenPipeError, OSError, ValueError) as exc:
+        try:
+            with open(LOG_PATH, "a", encoding="utf-8") as log:
+                log.write(f"\n[overlay writer] {type(exc).__name__}: {exc}\n")
+        except OSError:
+            pass
     finally:
         try:
             if proc.stdin and not proc.stdin.closed:
                 proc.stdin.close()
         except Exception:
             pass
+
+
+def _stderr_reader(proc):
+    """Drain FFmpeg stderr so diagnostics are retained and the stderr pipe cannot fill."""
+    if proc.stderr is None:
+        return
+    try:
+        with open(LOG_PATH, "a", encoding="utf-8") as log:
+            for raw_line in iter(proc.stderr.readline, b""):
+                try:
+                    log.write(raw_line.decode("utf-8", errors="replace"))
+                    log.flush()
+                except Exception:
+                    continue
+    except OSError:
+        pass
 
 
 def _stop_stream():
@@ -308,6 +334,9 @@ def _render_graphics_studio():
         _save_layers([])
         st.rerun()
     st.caption("Overlay canvas: 1280×720, transparent background. Photo/logo ko add karte waqt position aur width set karein.")
+    writer = st.session_state.get("overlay_thread")
+    if writer is not None and not writer.is_alive():
+        st.error("Overlay sender thread band ho gaya hai. Neeche FFmpeg log check karein.")
     st.markdown("**Graphics preview**")
     st.image(_compose_overlay(_load_layers()), caption="Transparent overlay preview (actual video ke upar composite hota hai)", use_container_width=True)
 
@@ -347,11 +376,15 @@ def render_streaming_page():
                 _save_layers([])  # start with a clean graphics canvas
                 target = server.rstrip("/") + "/" + key.strip()
                 stop_event = threading.Event()
+                try:
+                    LOG_PATH.write_text("", encoding="utf-8")
+                except OSError:
+                    pass
                 vf = f"scale={dims}:force_original_aspect_ratio=decrease,pad={dims}:(ow-iw)/2:(oh-ih)/2"
                 cmd = [
                     "ffmpeg", "-hide_banner", "-loglevel", "warning",
                     "-re", "-stream_loop", "-1", "-i", str(path),
-                    "-re", "-thread_queue_size", "512",
+                    "-thread_queue_size", "64",
                     "-f", "rawvideo", "-pix_fmt", "rgba",
                     "-video_size", f"{CANVAS_W}x{CANVAS_H}",
                     "-framerate", str(OVERLAY_FPS), "-i", "pipe:0",
@@ -365,9 +398,12 @@ def render_streaming_page():
                     "-ar", "44100", "-f", "flv", target
                 ]
                 try:
-                    process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, bufsize=0)
+                    process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, bufsize=0)
                     st.session_state.stream_process = process
                     st.session_state.overlay_stop_event = stop_event
+                    log_reader = threading.Thread(target=_stderr_reader, args=(process,), daemon=True)
+                    log_reader.start()
+                    st.session_state.ffmpeg_log_thread = log_reader
                     writer = threading.Thread(target=_overlay_writer, args=(process, stop_event), daemon=True)
                     writer.start()
                     st.session_state.overlay_thread = writer
@@ -380,5 +416,12 @@ def render_streaming_page():
 
     if running:
         _render_graphics_studio()
+    if LOG_PATH.exists():
+        with st.expander("FFmpeg diagnostic log", expanded=False):
+            try:
+                log_text = LOG_PATH.read_text(encoding="utf-8", errors="replace")
+                st.code(log_text[-12000:] if log_text else "Abhi koi FFmpeg warning/error record nahi hui.")
+            except OSError as exc:
+                st.caption(f"Log read nahi ho saka: {exc}")
     st.markdown("---")
     st.markdown("**Start se pehle:** YouTube Studio se Live Streaming enable karke RTMP server aur stream key lein. Key private rakhein. Uploaded video selected duration tak repeat hogi.")
