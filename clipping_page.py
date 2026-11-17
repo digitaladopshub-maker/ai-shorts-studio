@@ -11,7 +11,6 @@ from fonts import get_pro_font, get_font_family
 from effects_engine import get_filter_ffmpeg_string, get_style_effect_ffmpeg_string
 from subtitle_engine import get_subtitle_styling
 
-
 def render_clipping_page():
     st.markdown("""
         <style>
@@ -121,7 +120,7 @@ def render_clipping_page():
         # --- 2. SUBTITLE SETTING ---
         st.markdown("### Subtitle")
         enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
-    
+        
         style_preset = st.selectbox("Subtitle Preset", [
             "The Alex Hormozi Style", "Border Pop-Up", "Karaoke Highlight", "The Power Word Scale", 
             "Glow & Shine Effect", "The Minimal Subtitle Block", "Apple Style Minimal", "The Gradient Premium Stack", 
@@ -167,7 +166,7 @@ def render_clipping_page():
         # --- 3. CLIPPING MODE ---
         st.markdown("### Clipping Mode")
         clip_mode = st.selectbox("Clipping Mode", ["Manual", "Auto-Split AI"], label_visibility="collapsed")
-    
+        
         clip_ranges = []
         if clip_mode == "Manual":
             num_clips = st.number_input("Short Clips Quantity", min_value=1, max_value=10, value=1)
@@ -247,7 +246,7 @@ def render_clipping_page():
                     with st.spinner("Downloading Video (Please wait)..."):
                         if os.path.exists(video_path):
                             os.remove(video_path)
-                    
+                        
                         dl_cmd = (
                             f'yt-dlp --no-check-certificates --geo-bypass --remote-components ejs:npm '
                             f'--extractor-args "youtube:player_client=web,mweb" '
@@ -255,7 +254,7 @@ def render_clipping_page():
                             f'-o "{video_path}" "{video_url}"'
                         )
                         result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
-                    
+                        
                         if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
                             st.success("Video Successfully Downloaded & Saved!")
                             st.rerun()
@@ -283,7 +282,7 @@ def render_clipping_page():
         else:
             target_time = "0"
             vf_preview_parts = []
-        
+            
             # Determine X coordinate
             if st.session_state.enable_face_tracking:
                 f_x = detect_face_center(video_path, target_time)
@@ -307,7 +306,7 @@ def render_clipping_page():
 
             if enable_flip:
                 vf_preview_parts.append("hflip")
-        
+            
             f_str = get_filter_ffmpeg_string(filter_category, specific_filter)
             if f_str:
                 vf_preview_parts.append(f_str)
@@ -325,21 +324,21 @@ def render_clipping_page():
                 f'ffmpeg -y -ss {target_time} -i "{video_path}" -vframes 1 -vf "{vf_preview_str}" "{dynamic_preview_path}"', 
                 shell=True, capture_output=True
             )
-        
+            
             # --- SIDE-BY-SIDE LAYOUT: PREVIEW ON LEFT, CONTROLS ON RIGHT ---
             prev_col, ctrl_col = st.columns([1.2, 1.1])
-        
+            
             with prev_col:
                 if os.path.exists(dynamic_preview_path):
                     img = Image.open(dynamic_preview_path)
                     draw = ImageDraw.Draw(img)
-                
+                    
                     if enable_subs:
                         text_color, outline_color, _, _, _ = get_subtitle_styling(style_preset)
                         w, h = img.size
                         sample_words = ["CLIPPING", "PREVIEW", "VIRAL", "STUDIO"]
                         raw_text = " ".join(sample_words[:words_per_line])
-                    
+                        
                         wrap_width = max(8, int(16 - (font_size / 3)))
                         wrapped_lines = textwrap.wrap(raw_text, width=wrap_width)
                         wrapped_text = "\n".join(wrapped_lines)
@@ -359,14 +358,14 @@ def render_clipping_page():
                             (x_pos, y_pos), wrapped_text, font=font, fill=text_color, 
                             anchor="mm", align="center", stroke_width=max(1, int(preview_calc_size * 0.08)), stroke_fill=outline_color
                         )
-                    
+                        
                     st.image(img, width=preview_scale_w, caption=f"Live Preview | {output_format}")
 
             with ctrl_col:
                 st.checkbox("Smart AI Face Tracking", key="enable_face_tracking")
                 st.slider("Horizontal (Left/Right)", min_value=0, max_value=100, key="manual_offset_x")
                 st.slider("Vertical (Up/Down)", min_value=0, max_value=100, key="manual_offset_y")
-            
+                
             if st.button("❌ Remove / Change Video", use_container_width=True):
                 os.remove(video_path)
                 if os.path.exists(dynamic_preview_path):
@@ -376,10 +375,10 @@ def render_clipping_page():
 
             # --- BATCH DOWNLOAD BUTTON (WITHOUT HEADER) ---
             st.markdown("---")
-        
+            
             has_clips = len(st.session_state.generated_clips) > 0
             zip_path = os.path.join(DOWNLOAD_DIR, "all_shorts_clips.zip")
-        
+            
             zip_data = b""
             if has_clips:
                 with zipfile.ZipFile(zip_path, 'w') as zipf:
@@ -399,7 +398,7 @@ def render_clipping_page():
                 use_container_width=True,
                 disabled=not has_clips
             )
-        
+            
             if has_clips:
                 st.success("ZIP file Ready to Download")
             else:
@@ -428,7 +427,7 @@ def render_clipping_page():
             for i, (clip_num, start_sec, duration_sec) in enumerate(tasks):
                 cropped_file = os.path.join(DOWNLOAD_DIR, f"cropped_{clip_num}.mp4")
                 final_file = os.path.join(DOWNLOAD_DIR, f"final_short_{clip_num}.mp4")
-            
+                
                 render_vf_parts = []
                 if st.session_state.enable_face_tracking:
                     f_x = detect_face_center(video_path, start_sec)
@@ -452,7 +451,7 @@ def render_clipping_page():
 
                 if enable_flip:
                     render_vf_parts.append("hflip")
-            
+                
                 f_str = get_filter_ffmpeg_string(filter_category, specific_filter)
                 if f_str:
                     render_vf_parts.append(f_str)
@@ -462,7 +461,7 @@ def render_clipping_page():
                     render_vf_parts.append(e_str)
 
                 render_vf_parts.append(f"scale={scale_w}:{scale_h}")
-            
+                
                 if speed_val != 1.0:
                     render_vf_parts.append(f"setpts=PTS/{speed_val}")
 
@@ -490,26 +489,26 @@ def render_clipping_page():
                 if enable_subs and model:
                     whisper_audio_path = os.path.join(DOWNLOAD_DIR, f"whisper_audio_{clip_num}.wav")
                     subprocess.run(f'ffmpeg -y -i "{cropped_file}" -vn -acodec pcm_s16le -ar 16000 -ac 1 "{whisper_audio_path}"', shell=True, capture_output=True)
-                
+                    
                     align_map = {"Top (Safe Zone)": "6", "Middle-Center": "5", "Bottom (Safe Zone)": "2"}
                     align_val = align_map[caption_align]
-                
+                    
                     text_col, _, _, _, ass_color = get_subtitle_styling(style_preset)
                     ass_font_name = get_font_family(font_choice)
 
                     result = model.transcribe(whisper_audio_path if os.path.exists(whisper_audio_path) else cropped_file, word_timestamps=True)
                     ass_file = os.path.join(DOWNLOAD_DIR, f"subs_{clip_num}.ass")
-                
+                    
                     with open(ass_file, "w", encoding="utf-8") as f:
                         f.write(f"[Script Info]\nScriptType: v4.00+\nPlayResX: {scale_w}\nPlayResY: {scale_h}\n\n")
                         f.write("[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
-                    
+                        
                         margin_v_val = int(scale_h * 0.12) if "Bottom" in caption_align else (int(scale_h * 0.1) if "Top" in caption_align else int(scale_h * 0.5))
                         render_ass_fontsize = int(font_size * (scale_h / 480) * 1.5)
-                    
+                        
                         f.write(f"Style: Default,{ass_font_name},{render_ass_fontsize},{ass_color},&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},160,160,{margin_v_val},1\n\n")
                         f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
-                    
+                        
                         for segment in result['segments']:
                             if 'words' in segment:
                                 words = segment['words']
@@ -518,25 +517,25 @@ def render_clipping_page():
                                     start_t = chunk[0]['start']
                                     end_t = chunk[-1]['end']
                                     raw_str = " ".join([w['word'].strip() for w in chunk]).upper()
-                                
+                                    
                                     render_wrap_width = max(10, int(18 - (font_size / 4)))
                                     wrapped_chunk = textwrap.wrap(raw_str, width=render_wrap_width)
                                     text_str = "\\N".join(wrapped_chunk)
-                                
+                                    
                                     s_tot_m, s_s = divmod(start_t, 60)
                                     s_h, s_m = divmod(s_tot_m, 60)
-                                
+                                    
                                     e_tot_m, e_s = divmod(end_t, 60)
                                     e_h, e_m = divmod(e_tot_m, 60)
-                                
+                                    
                                     s_str = f"{int(s_h)}:{int(s_m):02d}:{int(s_s):02d}.{int((start_t%1)*100):02d}"
                                     e_str = f"{int(e_h)}:{int(e_m):02d}:{int(e_s):02d}.{int((end_t%1)*100):02d}"
-                                
+                                    
                                     f.write(f"Dialogue: 0,{s_str},{e_str},Default,,0,0,0,,{text_str}\n")
 
                     base_dir = os.path.dirname(os.path.abspath(__file__))
                     fonts_dir = os.path.join(base_dir, "fonts")
-                
+                    
                     sub_cmd = (
                         f'ffmpeg -y -i "{cropped_file}" '
                         f'-vf "ass={ass_file}:fontsdir={fonts_dir}" '
