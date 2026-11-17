@@ -363,96 +363,71 @@ def _render_graphics_studio():
 
 
 def _render_account_manager():
-    st.subheader("Streaming Accounts")
-    st.caption("Is live session ke liye accounts bari bari add karein. Agli visit par dobara enter karne honge.")
+    """Simple session-only destination slots: platform, stream key, active toggle."""
+    st.subheader("Streaming Platforms")
+    slots_key = "stream_destination_slots"
+    if slots_key not in st.session_state:
+        st.session_state[slots_key] = [{"id": "slot_1", "platform": "YouTube", "key": "", "active": False}]
 
-    profiles = _load_profiles()
-    drafts_key = "stream_account_drafts"
-    if drafts_key not in st.session_state:
-        st.session_state[drafts_key] = []
-
-    def account_editor(profile, is_new=False, index=0):
-        pid = profile.get("id") or profile.get("_draft_id") or f"new_{index}"
-        title = "New account" if is_new else profile.get("name", f"Account {index + 1}")
+    slots = st.session_state[slots_key]
+    active_profiles = []
+    st.markdown("<div class='destination-panel'>", unsafe_allow_html=True)
+    for index, slot in enumerate(slots):
+        sid = slot["id"]
         with st.container(border=True):
-            st.markdown(f"**{title}**")
-            name = st.text_input("Account / Channel Name", value=profile.get("name", ""),
-                                 placeholder="e.g. My YouTube Channel", key=f"account_name_{pid}")
+            c1, c2 = st.columns([3, 1])
             platform_options = list(PLATFORMS)
-            old_platform = profile.get("platform", "YouTube")
-            platform_index = platform_options.index(old_platform) if old_platform in platform_options else 0
-            platform = st.selectbox("Platform", platform_options, index=platform_index,
-                                    key=f"account_platform_{pid}")
-            server_key = f"account_server_{pid}"
-            # Set platform-specific default when the selected platform changes.
-            previous_key = f"account_prev_platform_{pid}"
-            previous_platform = st.session_state.get(previous_key, old_platform)
-            if platform != previous_platform:
-                st.session_state[server_key] = PLATFORMS.get(platform, "")
-                st.session_state[previous_key] = platform
+            old_platform = slot.get("platform", "YouTube")
+            platform = c1.selectbox(
+                f"Platform {index + 1}", platform_options,
+                index=platform_options.index(old_platform) if old_platform in platform_options else 0,
+                key=f"dest_platform_{sid}"
+            )
+            active = c2.toggle("Active", value=bool(slot.get("active", False)), key=f"dest_active_{sid}")
+            # Platform server is selected automatically and is not shown as a confusing editable field.
+            stream_key = st.text_input(
+                "Stream Key", value=slot.get("key", ""), type="password",
+                placeholder="Paste this platform's stream key", key=f"dest_key_{sid}"
+            )
+            if platform == "Custom RTMP":
+                server = st.text_input("RTMP Server URL", value=slot.get("server", ""),
+                                       placeholder="rtmp:// or rtmps://", key=f"dest_server_{sid}")
             else:
-                st.session_state.setdefault(previous_key, platform)
-            server = st.text_input("RTMP Server URL", value=profile.get("server") or PLATFORMS.get(platform, ""),
-                                   placeholder="rtmp://...", key=server_key)
-            stream_key = st.text_input("Stream Key", value=profile.get("key", ""), type="password",
-                                       placeholder="Enter stream key", key=f"account_key_{pid}")
-            c1, c2 = st.columns(2)
-            if c1.button("Save Account", key=f"save_account_{pid}", type="primary", use_container_width=True):
-                if not name.strip():
-                    st.error("Account / Channel Name enter karein.")
-                elif not server.strip().startswith(("rtmp://", "rtmps://")):
-                    st.error("Valid RTMP Server URL enter karein.")
-                elif not stream_key.strip():
-                    st.error("Stream Key enter karein.")
+                server = PLATFORMS.get(platform, "")
+            slot.update({"platform": platform, "key": stream_key, "active": active, "server": server})
+            if active:
+                if stream_key.strip() and server.strip().startswith(("rtmp://", "rtmps://")):
+                    active_profiles.append({
+                        "id": sid, "name": f"{platform} {index + 1}", "platform": platform,
+                        "server": server.strip(), "key": stream_key.strip()
+                    })
                 else:
-                    updated_profile = {"id": profile.get("id") or uuid.uuid4().hex[:10],
-                                       "name": name.strip(), "platform": platform,
-                                       "server": server.strip(), "key": stream_key.strip()}
-                    updated = [p for p in profiles if p.get("id") != updated_profile["id"]]
-                    updated.append(updated_profile)
-                    _save_profiles(updated)
-                    st.session_state[drafts_key] = [d for d in st.session_state[drafts_key]
-                                                     if d.get("_draft_id") != profile.get("_draft_id")]
-                    st.success(f"{name.strip()} is live session ke liye add ho gaya.")
-                    st.rerun()
-            if c2.button("Delete", key=f"delete_account_{pid}", use_container_width=True):
-                if not is_new and profile.get("id"):
-                    _save_profiles([p for p in profiles if p.get("id") != profile.get("id")])
-                st.session_state[drafts_key] = [d for d in st.session_state[drafts_key]
-                                                if d.get("_draft_id") != profile.get("_draft_id")]
-                st.rerun()
+                    st.warning("Active karne ke liye valid Stream Key enter karein." if platform != "Custom RTMP" else "Custom RTMP ke liye URL aur Stream Key dono enter karein.")
+    st.markdown("</div>", unsafe_allow_html=True)
+    # When the newest slot is activated with a valid key, automatically reveal the next empty slot.
+    if slots and slots[-1].get("active") and slots[-1].get("key", "").strip() and slots[-1].get("server", "").strip().startswith(("rtmp://", "rtmps://")):
+        slots.append({"id": f"slot_{uuid.uuid4().hex[:8]}", "platform": "YouTube", "key": "", "active": False})
+    st.session_state[slots_key] = slots
+    _save_profiles(active_profiles)
 
-    if profiles:
-        st.markdown("**Added accounts**")
-        for index, profile in enumerate(profiles):
-            account_editor(profile, is_new=False, index=index)
-    else:
-        account_editor({"id": None, "name": "", "platform": "YouTube",
-                        "server": PLATFORMS["YouTube"], "key": ""}, is_new=True, index=0)
-
-    for index, draft in enumerate(st.session_state[drafts_key]):
-        account_editor(draft, is_new=True, index=index + len(profiles) + 1)
-
-    c1, c2 = st.columns(2)
-    if c1.button("＋ Add Other Account", key="add_other_stream_account", use_container_width=True):
-        st.session_state[drafts_key].append({"_draft_id": uuid.uuid4().hex[:10], "id": None,
-                                             "name": "", "platform": "YouTube",
-                                             "server": PLATFORMS["YouTube"], "key": ""})
+    if st.button("＋ Add Another Platform", key="add_destination_slot", use_container_width=True):
+        slots.append({"id": f"slot_{uuid.uuid4().hex[:8]}", "platform": "YouTube", "key": "", "active": False})
+        st.session_state[slots_key] = slots
         st.rerun()
-    if c2.button("Done", key="done_stream_accounts", type="primary", use_container_width=True):
-        if not profiles:
-            st.warning("Pehle kam az kam ek account add karein.")
-        elif st.session_state[drafts_key]:
-            st.warning("Pehle open account forms save ya delete karein.")
-        else:
-            st.session_state["stream_accounts_done"] = True
-            st.success("Accounts ready. Ab live ke liye platforms select karein.")
 
 
 def render_streaming_page():
-    st.title("📡 Live Streaming Dashboard")
-    st.caption("Ek dafa encode karke selected RTMP destinations par distribute karein.")
-    st.caption("Is session mein YouTube, Facebook, TikTok ya Custom RTMP destinations add karke ek hi video ko stream karein.")
+    st.markdown("""<style>
+    .stApp, [data-testid="stAppViewContainer"] { background: #080b12; color: #f3f4f6; }
+    [data-testid="stHeader"] { background: rgba(8,11,18,0.95); }
+    [data-testid="stSidebar"] { background: #05070c; }
+    [data-testid="stVerticalBlockBorderWrapper"] > div { background: #101722; border-color: #263244; border-radius: 14px; }
+    div[data-testid="stTextInput"] input, div[data-testid="stSelectbox"] div,
+    div[data-testid="stNumberInput"] input { background: #111827; color: #f9fafb; }
+    div.stButton > button[kind="primary"] { background: #2563eb; border: 0; }
+    .destination-panel { margin-bottom: 8px; }
+    </style>""", unsafe_allow_html=True)
+    st.title("📡 Live Streaming Studio")
     _render_account_manager()
     st.markdown("---")
     proc = st.session_state.get("stream_process")
@@ -469,35 +444,17 @@ def render_streaming_page():
     else:
         uploaded = st.file_uploader("MP4 video upload karein", type=["mp4"], key="stream_video")
         profiles = _load_profiles()
-        selected_ids = st.multiselect(
-            "Is live ke liye accounts select karein",
-            options=[p["id"] for p in profiles],
-            format_func=lambda pid: next((f"{p['platform']} — {p['name']}" for p in profiles if p["id"] == pid), pid),
-            key="selected_stream_profiles",
-        )
-        with st.expander("One-time / manual destination (saved account ke baghair)"):
-            manual_platform = st.selectbox("Platform", ["YouTube", "Facebook", "TikTok", "Custom RTMP"], key="manual_platform")
-            manual_server = st.text_input("RTMP Server URL", value=PLATFORMS[manual_platform], key="manual_server")
-            manual_key = st.text_input("Stream Key", type="password", key="manual_key")
-            use_manual = st.checkbox("Is manual destination ko bhi include karein", key="use_manual_destination")
         hours = st.number_input("Stream duration (hours)", min_value=1, max_value=12, value=4, step=1)
         quality = st.selectbox("Output quality", ["1080p", "720p", "480p"])
         profiles_quality = {"1080p": ("1920:1080", "4500k"), "720p": ("1280:720", "2500k"), "480p": ("854:480", "1200k")}
         dims, rate = profiles_quality[quality]
-        st.caption(f"{quality} • H.264 {rate} • AAC audio • Single encode")
         if st.button("▶ Start Multi-Platform Live", type="primary", use_container_width=True):
-            destinations = [p for p in profiles if p["id"] in selected_ids]
-            if use_manual:
-                if not manual_server.strip().startswith(("rtmp://", "rtmps://")) or not manual_key.strip():
-                    st.error("Manual destination ke liye valid RTMP URL aur key enter karein.")
-                    destinations = None
-                else:
-                    destinations.append({"name": manual_platform + " (manual)", "server": manual_server.strip(), "key": manual_key.strip()})
+            destinations = list(profiles)
             if destinations is not None:
                 if uploaded is None:
                     st.error("Pehle MP4 video upload karein.")
                 elif not destinations:
-                    st.error("Kam az kam ek saved ya manual platform select karein.")
+                    st.error("Kam az kam ek platform ka Active toggle ON karein aur Stream Key enter karein.")
                 else:
                     path = STREAM_DIR / "live_input.mp4"
                     path.write_bytes(uploaded.getbuffer())
@@ -554,4 +511,3 @@ def render_streaming_page():
             except OSError as exc:
                 st.caption(f"Log read nahi ho saka: {exc}")
     st.markdown("---")
-    st.caption("Account details sirf current app session mein rehti hain; app session khatam hone par dobara enter karni hongi. Platform ki apni live-streaming eligibility aur valid RTMP details zaroori hain.")
