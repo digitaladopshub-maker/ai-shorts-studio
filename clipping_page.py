@@ -10,6 +10,8 @@ from PIL import Image, ImageDraw
 from fonts import get_pro_font, get_font_family
 from effects_engine import get_filter_ffmpeg_string, get_style_effect_ffmpeg_string
 from subtitle_engine import get_subtitle_styling
+from face_tracker import sample_face_track, build_crop_expressions
+from ai_engine.viral_detector import rank_transcript_segments
 
 
 def render_clipping_page():
@@ -29,11 +31,8 @@ def render_clipping_page():
     if 'reset_trigger' not in st.session_state:
         st.session_state.reset_trigger = 0
 
-    if 'enable_face_tracking' not in st.session_state:
-        st.session_state.enable_face_tracking = False
-
     if 'manual_offset_x' not in st.session_state:
-        st.session_state.manual_offset_x = 35
+        st.session_state.manual_offset_x = 50
 
     if 'manual_offset_y' not in st.session_state:
         st.session_state.manual_offset_y = 50
@@ -62,28 +61,6 @@ def render_clipping_page():
     video_path = os.path.join(DOWNLOAD_DIR, "input_video.mp4")
     bg_music_path = os.path.join(DOWNLOAD_DIR, "bg_music.mp3")
 
-    def detect_face_center(v_path, start_sec):
-        try:
-            cap = cv2.VideoCapture(v_path)
-            cap.set(cv2.CAP_PROP_POS_MSEC, int(start_sec) * 1000)
-            ret, frame = cap.read()
-            cap.release()
-            if not ret or frame is None:
-                return None
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-            if not os.path.exists(cascade_path):
-                return None
-            face_cascade = cv2.CascadeClassifier(cascade_path)
-            if face_cascade.empty():
-                return None
-            faces = face_cascade.detectMultiScale(gray, 1.1, 4)
-            if len(faces) > 0:
-                x, y, w, h = faces[0]
-                return x + (w // 2)
-        except Exception:
-            return None
-        return None
 
     # --- HEADER SECTION ---
     st.markdown('<p class="main-title">AI Clipping</p>', unsafe_allow_html=True)
@@ -182,7 +159,8 @@ def render_clipping_page():
                 clip_ranges.append((s_start, s_dur))
         else:
             target_clip_len = st.selectbox("Target Duration (Sec)", [10, 20, 30, 40, 50, 60, 70, 80, 90, 100], index=2)
-            st.info("AI will automatically split video into smart clips.")
+            max_auto_clips = st.selectbox("Number of AI Shorts", [3, 5, 10], index=0)
+            st.info("AI transcript analysis se high-potential, non-duplicate moments select karega.")
 
         st.markdown("---")
 
@@ -286,24 +264,23 @@ def render_clipping_page():
             target_time = "0"
             vf_preview_parts = []
 
-            # Determine X coordinate
-            if st.session_state.enable_face_tracking:
-                f_x = detect_face_center(video_path, target_time)
-                if f_x:
-                    f_x_expr = str(f_x)
+            # Automatic face-aware preview. Full rendering analyses each clip at
+            # regular intervals and interpolates a smooth crop path.
+            cap_meta = cv2.VideoCapture(video_path)
+            src_w = int(cap_meta.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+            src_h = int(cap_meta.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+            cap_meta.release()
+            if "9:16" in output_format and src_w > 0 and src_h > 0:
+                preview_track = sample_face_track(video_path, 0, 1.5, sample_interval=0.75)
+                if preview_track:
+                    face_cx, face_cy = preview_track[0][1], preview_track[0][2]
+                    crop_w = "min(iw\\,ih*9/16)"
+                    crop_h = "min(ih\\,iw*16/9)"
+                    crop_x = f"clip({face_cx:.2f}-{crop_w}/2\\,0\\,iw-({crop_w}))"
+                    crop_y = f"clip({face_cy:.2f}-{crop_h}*0.42\\,0\\,ih-({crop_h}))"
+                    vf_preview_parts = [f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}"]
                 else:
-                    f_x_expr = f"in_w * {st.session_state.manual_offset_x / 100.0}"
-            else:
-                f_x_expr = f"in_w * {st.session_state.manual_offset_x / 100.0}"
-
-            f_y_expr = f"in_h * {st.session_state.manual_offset_y / 100.0}"
-
-            if "9:16" in output_format:
-                crop_w = f"ih*{scale_w}/{scale_h}"
-                crop_h = "ih*0.95"
-                crop_x = f"clip({f_x_expr}-{crop_w}/2\\, 0\\, in_w-{crop_w})"
-                crop_y = f"clip({f_y_expr}-{crop_h}/2\\, 0\\, in_h-{crop_h})"
-                vf_preview_parts = [f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}"]
+                    vf_preview_parts = [crop_filter]
             else:
                 vf_preview_parts = [crop_filter]
 
@@ -365,9 +342,11 @@ def render_clipping_page():
                     st.image(img, width=preview_scale_w, caption=f"Live Preview | {output_format}")
 
             with ctrl_col:
-                st.checkbox("Smart AI Face Tracking", key="enable_face_tracking")
-                st.slider("Horizontal (Left/Right)", min_value=0, max_value=100, key="manual_offset_x")
-                st.slider("Vertical (Up/Down)", min_value=0, max_value=100, key="manual_offset_y")
+                st.success("Smart Face Tracking: AUTOMATIC ON")
+                st.caption("Har clip ke andar sampled face positions smooth karke crop follow karega. Face na mile to safe centre framing use hogi.")
+                with st.expander("Advanced fallback framing"):
+                    st.slider("Horizontal fallback", min_value=0, max_value=100, key="manual_offset_x")
+                    st.slider("Vertical fallback", min_value=0, max_value=100, key="manual_offset_y")
 
             if st.button("❌ Remove / Change Video", use_container_width=True):
                 os.remove(video_path)
@@ -413,14 +392,50 @@ def render_clipping_page():
         if clip_mode == "Manual" and 'clip_ranges' in locals():
             for idx, (s_st, s_du) in enumerate(clip_ranges):
                 try:
-                    t_start, t_dur = int(s_st), int(s_du)
-                except:
+                    t_start, t_dur = max(0, int(s_st)), max(1, int(s_du))
+                except (TypeError, ValueError):
                     t_start, t_dur = idx * 30, 28
                 tasks.append((idx + 1, t_start, t_dur))
-        else:
-            tasks = [(1, 0, target_clip_len), (2, target_clip_len + 5, target_clip_len), (3, (target_clip_len * 2) + 10, target_clip_len)]
 
-        model = whisper.load_model("base") if enable_subs else None
+        # Whisper is used locally for captions and/or transcript-based AI clipping.
+        needs_transcript = clip_mode == "Auto-Split AI"
+        model = None
+        transcript_segments = []
+        if enable_subs or needs_transcript:
+            try:
+                with st.spinner("Loading local Whisper model for analysis..."):
+                    model = whisper.load_model("base")
+            except Exception as exc:
+                st.error(f"Whisper model load failed: {exc}")
+
+        if needs_transcript and model is not None:
+            try:
+                with st.spinner("AI poori video ka transcript aur context analyze kar raha hai..."):
+                    full_result = model.transcribe(video_path, word_timestamps=False, verbose=False)
+                    transcript_segments = full_result.get("segments", [])
+                ranked = rank_transcript_segments(
+                    transcript_segments, target_duration=float(target_clip_len),
+                    max_clips=int(max_auto_clips), min_duration=min(8, int(target_clip_len))
+                )
+                if ranked:
+                    tasks = [(idx + 1, int(item["start"]), max(1, int(round(item["duration"]))))
+                             for idx, item in enumerate(ranked)]
+                    st.markdown("### AI Viral Moment Analysis")
+                    for idx, item in enumerate(ranked, 1):
+                        st.write(f"**Clip {idx} — {item['score']}/100** · {int(item['start'])}s–{int(item['end'])}s")
+                        st.caption(item["text"][:260])
+                else:
+                    st.warning("Transcript se reliable clip windows nahi milay. Automatic fallback timestamps use honge.")
+            except Exception as exc:
+                st.warning(f"AI transcript analysis complete nahi ho saka; fallback clipping use hogi. Details: {exc}")
+
+        if not tasks and clip_mode == "Auto-Split AI":
+            cap = cv2.VideoCapture(video_path)
+            total_duration = (cap.get(cv2.CAP_PROP_FRAME_COUNT) / max(cap.get(cv2.CAP_PROP_FPS), 1))
+            cap.release()
+            fallback_count = min(int(max_auto_clips), max(1, int(total_duration // max(1, int(target_clip_len)))))
+            tasks = [(i + 1, i * int(target_clip_len), int(target_clip_len)) for i in range(fallback_count)]
+
         st.session_state.generated_clips = []
 
         with st.spinner("Processing High-Quality Professional Shorts (Fast Speed)..."):
@@ -430,22 +445,27 @@ def render_clipping_page():
                 final_file = os.path.join(DOWNLOAD_DIR, f"final_short_{clip_num}.mp4")
 
                 render_vf_parts = []
-                if st.session_state.enable_face_tracking:
-                    f_x = detect_face_center(video_path, start_sec)
-                    if f_x:
-                        f_x_expr = str(f_x)
+                cap_meta = cv2.VideoCapture(video_path)
+                src_w = int(cap_meta.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+                src_h = int(cap_meta.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+                cap_meta.release()
+
+                if "9:16" in output_format and src_w > 0 and src_h > 0:
+                    face_samples = sample_face_track(video_path, start_sec, duration_sec,
+                                                     sample_interval=0.65, max_width=480)
+                    crop_w = "min(iw\\,ih*9/16)"
+                    crop_h = "min(ih\\,iw*16/9)"
+                    fallback_cx = src_w * (st.session_state.manual_offset_x / 100.0)
+                    fallback_cy = src_h * (st.session_state.manual_offset_y / 100.0)
+                    if face_samples:
+                        crop_x, crop_y = build_crop_expressions(
+                            face_samples, crop_w, crop_h, src_w, src_h,
+                            fallback_x=f"clip({fallback_cx:.2f}-{crop_w}/2\\,0\\,iw-({crop_w}))",
+                            fallback_y=f"clip({fallback_cy:.2f}-{crop_h}*0.42\\,0\\,ih-({crop_h}))"
+                        )
                     else:
-                        f_x_expr = f"in_w * {st.session_state.manual_offset_x / 100.0}"
-                else:
-                    f_x_expr = f"in_w * {st.session_state.manual_offset_x / 100.0}"
-
-                f_y_expr = f"in_h * {st.session_state.manual_offset_y / 100.0}"
-
-                if "9:16" in output_format:
-                    crop_w = f"ih*{scale_w}/{scale_h}"
-                    crop_h = "ih*0.95"
-                    crop_x = f"clip({f_x_expr}-{crop_w}/2\\, 0\\, in_w-{crop_w})"
-                    crop_y = f"clip({f_y_expr}-{crop_h}/2\\, 0\\, in_h-{crop_h})"
+                        crop_x = f"clip({fallback_cx:.2f}-{crop_w}/2\\,0\\,iw-({crop_w}))"
+                        crop_y = f"clip({fallback_cy:.2f}-{crop_h}*0.42\\,0\\,ih-({crop_h}))"
                     render_vf_parts = [f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}"]
                 else:
                     render_vf_parts = [crop_filter]
@@ -474,7 +494,10 @@ def render_clipping_page():
                     f'-vf "{render_vf_str}" -af "{audio_filter_str}" '
                     f'-c:v libx264 -preset ultrafast -crf 20 -c:a aac "{cropped_file}"'
                 )
-                subprocess.run(crop_cmd, shell=True)
+                crop_result = subprocess.run(crop_cmd, shell=True, capture_output=True, text=True)
+                if crop_result.returncode != 0 or not os.path.exists(cropped_file):
+                    st.error(f"Clip {clip_num} render failed: {(crop_result.stderr or 'FFmpeg error')[-1200:]}")
+                    continue
 
                 mixed_audio_file = os.path.join(DOWNLOAD_DIR, f"mixed_{clip_num}.mp4")
                 if enable_bg_music and os.path.exists(bg_music_path):
@@ -548,7 +571,10 @@ def render_clipping_page():
                         os.remove(final_file)
                     os.rename(cropped_file, final_file)
 
-                st.session_state.generated_clips.append((clip_num, final_file))
+                if os.path.exists(final_file) and os.path.getsize(final_file) > 0:
+                    st.session_state.generated_clips.append((clip_num, final_file))
+                else:
+                    st.warning(f"Clip {clip_num} export file generate nahi hui.")
 
         st.rerun()
 
