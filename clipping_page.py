@@ -420,10 +420,22 @@ def render_clipping_page():
                 if ranked:
                     tasks = [(idx + 1, int(item["start"]), max(1, int(round(item["duration"]))))
                              for idx, item in enumerate(ranked)]
-                    st.markdown("### AI Viral Moment Analysis")
+                    st.markdown("### AI Context & Viral Moment Analysis")
+                    st.caption("Score transcript signals par based hai: hook, context, complete thought, coherence aur Whisper speech confidence. Yeh virality ki guarantee nahi.")
                     for idx, item in enumerate(ranked, 1):
-                        st.write(f"**Clip {idx} — {item['score']}/100** · {int(item['start'])}s–{int(item['end'])}s")
-                        st.caption(item["text"][:260])
+                        with st.expander(
+                            f"Clip {idx} — AI Selection Score {item['score']}/100 · "
+                            f"{int(item['start'])}s–{int(item['end'])}s",
+                            expanded=(idx == 1)
+                        ):
+                            st.write(item["text"][:700])
+                            if item.get("reason"):
+                                st.caption("Selection signals: " + item["reason"])
+                            factor_cols = st.columns(3)
+                            factor_items = list(item.get("factors", {}).items())
+                            for factor_idx, (factor_name, factor_value) in enumerate(factor_items):
+                                with factor_cols[factor_idx % 3]:
+                                    st.metric(factor_name.replace("_", " ").title(), f"{factor_value}/100")
                 else:
                     st.warning("Transcript se reliable clip windows nahi milay. Automatic fallback timestamps use honge.")
             except Exception as exc:
