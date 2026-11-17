@@ -30,3 +30,29 @@ No additional Python dependency is required; Pillow is already included in `requ
 - Streamlit Community Cloud can sleep, restart, or enforce resource limits; uninterrupted multi-hour streaming is not guaranteed there.
 - Uploaded videos and overlay assets are stored on the app server's local disk and may be lost after a restart/redeploy.
 - Keep the YouTube stream key private. Do not commit stream keys, cookies, `.env` files, or secrets to GitHub.
+
+## Multi-platform streaming update
+
+The streaming dashboard now supports saved, editable RTMP destination profiles and selecting multiple saved destinations before starting a stream. FFmpeg's tee muxer sends one encoded output to the selected destinations.
+
+### Secure saved stream keys
+
+Add a stable Fernet key to Streamlit Community Cloud: **App → Settings → Secrets**:
+
+```toml
+STREAM_KEY_ENCRYPTION_KEY = "PASTE_A_FERNET_KEY_HERE"
+```
+
+Generate a key locally with:
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Do not commit this key or any RTMP stream key to GitHub. If the encryption key changes, previously saved profiles cannot be decrypted. Keep a secure backup of the encryption key.
+
+### Important architecture limitation
+
+Adding or removing an RTMP destination while a stream is already running is not implemented by the FFmpeg tee output in this version. That capability requires a persistent relay service (for example, a separately hosted MediaMTX worker) and per-destination forwarding workers. Streamlit Community Cloud alone is not a reliable place to host that persistent relay. The current update supports multiple destinations selected before starting the live stream, without encoding the video separately for each destination.
+
+TikTok requires an RTMP server URL and stream key to be available for the user's account. Platform eligibility and live permissions are controlled by each platform.

@@ -5,10 +5,12 @@ import time
 import threading
 import subprocess
 import uuid
+import base64
 from pathlib import Path
 
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
+from cryptography.fernet import Fernet, InvalidToken
 
 BASE_DIR = Path(__file__).resolve().parent
 STREAM_DIR = BASE_DIR / "streaming_uploads"
@@ -20,6 +22,47 @@ ASSET_DIR.mkdir(exist_ok=True)
 CANVAS_W, CANVAS_H = 1280, 720
 OVERLAY_FPS = 5
 LOG_PATH = STREAM_DIR / "ffmpeg_live.log"
+PROFILES_PATH = STREAM_DIR / "stream_profiles.enc"
+
+PLATFORMS = {
+    "YouTube": "rtmp://a.rtmp.youtube.com/live2",
+    "Facebook": "rtmps://live-api-s.facebook.com:443/rtmp/",
+    "TikTok": "",
+    "Custom RTMP": "",
+}
+
+def _encryption_key():
+    """Read a stable Fernet key from Streamlit secrets or environment."""
+    key = os.environ.get("STREAM_KEY_ENCRYPTION_KEY", "").strip()
+    if not key:
+        try:
+            key = str(st.secrets.get("STREAM_KEY_ENCRYPTION_KEY", "")).strip()
+        except Exception:
+            key = ""
+    return key or None
+
+def _load_profiles():
+    key = _encryption_key()
+    if not key or not PROFILES_PATH.exists():
+        return []
+    try:
+        raw = PROFILES_PATH.read_bytes()
+        return json.loads(Fernet(key.encode()).decrypt(raw).decode("utf-8"))
+    except (InvalidToken, ValueError, OSError, TypeError):
+        return []
+
+def _save_profiles(profiles):
+    key = _encryption_key()
+    if not key:
+        raise RuntimeError("Streamlit Secrets mein STREAM_KEY_ENCRYPTION_KEY set karein. Is ke baghair keys save nahi hongi.")
+    encrypted = Fernet(key.encode()).encrypt(json.dumps(profiles).encode("utf-8"))
+    tmp = PROFILES_PATH.with_suffix(".tmp")
+    tmp.write_bytes(encrypted)
+    os.replace(tmp, PROFILES_PATH)
+
+def _tee_escape(value):
+    # FFmpeg tee URL option escaping. RTMP keys normally contain URL-safe characters.
+    return str(value).replace("\\", "\\\\").replace("|", "\\|").replace("[", "\\[").replace("]", "\\]")
 
 
 def _alive(proc):
@@ -341,78 +384,143 @@ def _render_graphics_studio():
     st.image(_compose_overlay(_load_layers()), caption="Transparent overlay preview (actual video ke upar composite hota hai)", use_container_width=True)
 
 
+def _render_account_manager():
+    st.subheader("🔐 Saved Streaming Accounts")
+    st.caption("Keys encrypted form mein save hoti hain. Encryption key Streamlit Secrets mein configure karna zaroori hai.")
+    if not _encryption_key():
+        st.warning("Keys save karne ke liye Streamlit app ke Secrets mein STREAM_KEY_ENCRYPTION_KEY add karein. Fernet key locally generate kar sakte hain: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\"")
+    profiles = _load_profiles()
+    with st.expander("＋ Add / Edit streaming account", expanded=not bool(profiles)):
+        existing_names = [p.get("name", "") for p in profiles]
+        choice = st.selectbox("Existing account edit karein ya new account banayein", ["＋ New account"] + existing_names, key="profile_choice")
+        current = next((p for p in profiles if p.get("name") == choice), {}) if choice != "＋ New account" else {}
+        with st.form("stream_profile_form"):
+            name = st.text_input("Account / channel name", value=current.get("name", ""))
+            platform = st.selectbox("Platform", list(PLATFORMS), index=list(PLATFORMS).index(current.get("platform", "YouTube")) if current.get("platform") in PLATFORMS else 0)
+            default_server = current.get("server", PLATFORMS.get(platform, ""))
+            server = st.text_input("RTMP Server URL", value=default_server)
+            stream_key = st.text_input("Stream Key", value=current.get("key", ""), type="password")
+            save = st.form_submit_button("Save account securely")
+        if save:
+            if not name.strip() or not server.strip().startswith(("rtmp://", "rtmps://")) or not stream_key.strip():
+                st.error("Account name, valid RTMP URL aur Stream Key zaroori hain.")
+            else:
+                updated = [p for p in profiles if p.get("name") != name.strip() and p.get("name") != choice]
+                updated.append({"id": current.get("id", uuid.uuid4().hex[:10]), "name": name.strip(), "platform": platform, "server": server.strip(), "key": stream_key.strip()})
+                try:
+                    _save_profiles(updated)
+                    st.success("Account encrypted form mein save ho gaya.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(str(exc))
+    if profiles:
+        for profile in profiles:
+            with st.container(border=True):
+                a, b = st.columns([5, 1])
+                a.markdown(f"**{profile['name']}** · {profile['platform']}")
+                a.caption(profile.get("server", ""))
+                if b.button("Delete", key=f"delete_profile_{profile['id']}"):
+                    try:
+                        _save_profiles([p for p in profiles if p.get("id") != profile.get("id")])
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(str(exc))
+
+
 def render_streaming_page():
     st.title("📡 Live Streaming Dashboard")
-    st.caption("MP4 video ko FFmpeg ke zariye YouTube Live RTMP par stream karein.")
-    st.warning("Long-running stream ki reliability hosting platform ke sleep/restart aur resource limits par depend karti hai. Persistent worker zyada reliable hota hai.")
+    st.caption("Ek dafa encode karke selected RTMP destinations par distribute karein.")
+    st.warning("Multi-platform start ke liye FFmpeg tee muxer use hota hai. Live ke beech destination add/remove karne ke liye separate persistent relay service (MediaMTX) deploy karna hoga; Community Cloud app akeli is feature ko reliable taur par host nahi kar sakti.")
+    _render_account_manager()
+    st.markdown("---")
     proc = st.session_state.get("stream_process")
     running = _alive(proc)
 
     if running:
         st.success("Live FFmpeg process chal raha hai.")
+        active = st.session_state.get("active_destinations", [])
+        st.write("**Active destinations:** " + (", ".join(active) if active else "Unknown"))
         if st.button("⏹ Stop Streaming", type="primary", use_container_width=True):
             _stop_stream()
+            st.session_state.active_destinations = []
             st.rerun()
     else:
         uploaded = st.file_uploader("MP4 video upload karein", type=["mp4"], key="stream_video")
-        server = st.text_input("YouTube Live Server URL", value="rtmp://a.rtmp.youtube.com/live2")
-        key = st.text_input("Stream Key", type="password", help="Is key ko private rakhein.")
+        profiles = _load_profiles()
+        selected_ids = st.multiselect(
+            "Is live ke liye accounts select karein",
+            options=[p["id"] for p in profiles],
+            format_func=lambda pid: next((f"{p['platform']} — {p['name']}" for p in profiles if p["id"] == pid), pid),
+            key="selected_stream_profiles",
+        )
+        with st.expander("One-time / manual destination (saved account ke baghair)"):
+            manual_platform = st.selectbox("Platform", ["YouTube", "Facebook", "TikTok", "Custom RTMP"], key="manual_platform")
+            manual_server = st.text_input("RTMP Server URL", value=PLATFORMS[manual_platform], key="manual_server")
+            manual_key = st.text_input("Stream Key", type="password", key="manual_key")
+            use_manual = st.checkbox("Is manual destination ko bhi include karein", key="use_manual_destination")
         hours = st.number_input("Stream duration (hours)", min_value=1, max_value=12, value=4, step=1)
         quality = st.selectbox("Output quality", ["1080p", "720p", "480p"])
-        profiles = {"1080p": ("1920:1080", "4500k"), "720p": ("1280:720", "2500k"), "480p": ("854:480", "1200k")}
-        dims, rate = profiles[quality]
-        st.caption(f"{quality} • H.264 video {rate} • AAC audio")
-        st.caption("Upload limit config mein 2048 MB hai; hosting platform ki apni limits bhi apply ho sakti hain.")
-        if st.button("▶ Start Live Stream", type="primary", use_container_width=True):
-            if uploaded is None:
-                st.error("Pehle MP4 video upload karein.")
-            elif not server.strip().startswith("rtmp"):
-                st.error("Valid RTMP server URL enter karein.")
-            elif not key.strip():
-                st.error("YouTube Live stream key enter karein.")
-            else:
-                path = STREAM_DIR / "live_input.mp4"
-                path.write_bytes(uploaded.getbuffer())
-                _save_layers([])  # start with a clean graphics canvas
-                target = server.rstrip("/") + "/" + key.strip()
-                stop_event = threading.Event()
-                try:
-                    LOG_PATH.write_text("", encoding="utf-8")
-                except OSError:
-                    pass
-                vf = f"scale={dims}:force_original_aspect_ratio=decrease,pad={dims}:(ow-iw)/2:(oh-ih)/2"
-                cmd = [
-                    "ffmpeg", "-hide_banner", "-loglevel", "warning",
-                    "-re", "-stream_loop", "-1", "-i", str(path),
-                    "-thread_queue_size", "64",
-                    "-f", "rawvideo", "-pix_fmt", "rgba",
-                    "-video_size", f"{CANVAS_W}x{CANVAS_H}",
-                    "-framerate", str(OVERLAY_FPS), "-i", "pipe:0",
-                    "-filter_complex",
-                    f"[0:v]{vf}[base];[1:v]scale={dims}:flags=fast_bilinear[ov];[base][ov]overlay=0:0:format=auto:shortest=0[v]",
-                    "-map", "[v]", "-map", "0:a?",
-                    "-t", str(int(hours * 3600)), "-r", "30",
-                    "-c:v", "libx264", "-preset", "veryfast",
-                    "-b:v", rate, "-maxrate", rate, "-bufsize", rate,
-                    "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k",
-                    "-ar", "44100", "-f", "flv", target
-                ]
-                try:
-                    process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, bufsize=0)
-                    st.session_state.stream_process = process
-                    st.session_state.overlay_stop_event = stop_event
-                    log_reader = threading.Thread(target=_stderr_reader, args=(process,), daemon=True)
-                    log_reader.start()
-                    st.session_state.ffmpeg_log_thread = log_reader
-                    writer = threading.Thread(target=_overlay_writer, args=(process, stop_event), daemon=True)
-                    writer.start()
-                    st.session_state.overlay_thread = writer
-                    st.success("Stream start ho gayi. YouTube Studio mein Live status verify karein.")
-                    st.rerun()
-                except FileNotFoundError:
-                    st.error("FFmpeg server par available nahi. packages.txt check karein.")
-                except Exception as e:
-                    st.error(f"Stream start nahi ho saki: {e}")
+        profiles_quality = {"1080p": ("1920:1080", "4500k"), "720p": ("1280:720", "2500k"), "480p": ("854:480", "1200k")}
+        dims, rate = profiles_quality[quality]
+        st.caption(f"{quality} • H.264 {rate} • AAC audio • Single encode")
+        if st.button("▶ Start Multi-Platform Live", type="primary", use_container_width=True):
+            destinations = [p for p in profiles if p["id"] in selected_ids]
+            if use_manual:
+                if not manual_server.strip().startswith(("rtmp://", "rtmps://")) or not manual_key.strip():
+                    st.error("Manual destination ke liye valid RTMP URL aur key enter karein.")
+                    destinations = None
+                else:
+                    destinations.append({"name": manual_platform + " (manual)", "server": manual_server.strip(), "key": manual_key.strip()})
+            if destinations is not None:
+                if uploaded is None:
+                    st.error("Pehle MP4 video upload karein.")
+                elif not destinations:
+                    st.error("Kam az kam ek saved ya manual platform select karein.")
+                else:
+                    path = STREAM_DIR / "live_input.mp4"
+                    path.write_bytes(uploaded.getbuffer())
+                    _save_layers([])
+                    outputs = []
+                    active_names = []
+                    for dest in destinations:
+                        target = dest["server"].rstrip("/") + "/" + dest["key"].strip()
+                        outputs.append("[f=flv:onfail=ignore]" + _tee_escape(target))
+                        active_names.append(dest.get("platform", "") + " — " + dest.get("name", ""))
+                    tee_target = "|".join(outputs)
+                    stop_event = threading.Event()
+                    try:
+                        LOG_PATH.write_text("", encoding="utf-8")
+                    except OSError:
+                        pass
+                    vf = f"scale={dims}:force_original_aspect_ratio=decrease,pad={dims}:(ow-iw)/2:(oh-ih)/2"
+                    cmd = [
+                        "ffmpeg", "-hide_banner", "-loglevel", "warning",
+                        "-re", "-stream_loop", "-1", "-i", str(path),
+                        "-thread_queue_size", "64", "-f", "rawvideo", "-pix_fmt", "rgba",
+                        "-video_size", f"{CANVAS_W}x{CANVAS_H}", "-framerate", str(OVERLAY_FPS), "-i", "pipe:0",
+                        "-filter_complex", f"[0:v]{vf}[base];[1:v]scale={dims}:flags=fast_bilinear[ov];[base][ov]overlay=0:0:format=auto:shortest=0[v]",
+                        "-map", "[v]", "-map", "0:a?", "-t", str(int(hours * 3600)), "-r", "30",
+                        "-c:v", "libx264", "-preset", "veryfast", "-b:v", rate, "-maxrate", rate, "-bufsize", rate,
+                        "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
+                        "-f", "tee", tee_target,
+                    ]
+                    try:
+                        process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, bufsize=0)
+                        st.session_state.stream_process = process
+                        st.session_state.overlay_stop_event = stop_event
+                        log_reader = threading.Thread(target=_stderr_reader, args=(process,), daemon=True)
+                        log_reader.start()
+                        st.session_state.ffmpeg_log_thread = log_reader
+                        writer = threading.Thread(target=_overlay_writer, args=(process, stop_event), daemon=True)
+                        writer.start()
+                        st.session_state.overlay_thread = writer
+                        st.session_state.active_destinations = active_names
+                        st.success("Multi-platform stream start command bhej diya gaya. Har platform par Live status verify karein.")
+                        st.rerun()
+                    except FileNotFoundError:
+                        st.error("FFmpeg server par available nahi. packages.txt check karein.")
+                    except Exception as exc:
+                        st.error(f"Stream start nahi ho saki: {exc}")
 
     if running:
         _render_graphics_studio()
@@ -424,4 +532,4 @@ def render_streaming_page():
             except OSError as exc:
                 st.caption(f"Log read nahi ho saka: {exc}")
     st.markdown("---")
-    st.markdown("**Start se pehle:** YouTube Studio se Live Streaming enable karke RTMP server aur stream key lein. Key private rakhein. Uploaded video selected duration tak repeat hogi.")
+    st.markdown("**Note:** Selected destinations ek hi encoded output share karte hain. Kisi destination ka RTMP key/account eligibility aur platform-side live permissions alag se valid honi chahiye. Live ke dauran destination add/remove ka next stage persistent relay service par hoga.")
