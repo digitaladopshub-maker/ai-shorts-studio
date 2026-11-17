@@ -1,0 +1,7 @@
+[
+  "tests/test_phase1.py::test_context_ranker_uses_whisper_quality_and_complete_thought",
+  "tests/test_phase1.py::test_face_crop_expression_is_smooth_and_clamped",
+  "tests/test_phase1.py::test_transcript_ranker_returns_high_value_non_overlapping_clips",
+  "tests/test_phase3.py::test_mouth_patch_returns_normalized_region",
+  "tests/test_phase3.py::test_multi_face_tracker_handles_video_without_detectable_faces"
+]
