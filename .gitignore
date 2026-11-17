@@ -7,3 +7,5 @@ __pycache__/
 downloads/
 streaming_uploads/
 .streamlit/secrets.toml
+*.tmp
+*.log

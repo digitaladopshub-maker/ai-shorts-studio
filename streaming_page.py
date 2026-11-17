@@ -1,42 +1,384 @@
-import os, subprocess, streamlit as st
-STREAM_DIR="streaming_uploads"; os.makedirs(STREAM_DIR,exist_ok=True)
-def _alive(proc): return proc is not None and proc.poll() is None
+
+import os
+import json
+import time
+import threading
+import subprocess
+import uuid
+from pathlib import Path
+
+import streamlit as st
+from PIL import Image, ImageDraw, ImageFont
+
+BASE_DIR = Path(__file__).resolve().parent
+STREAM_DIR = BASE_DIR / "streaming_uploads"
+ASSET_DIR = STREAM_DIR / "overlay_assets"
+STATE_PATH = STREAM_DIR / "overlay_state.json"
+STREAM_DIR.mkdir(exist_ok=True)
+ASSET_DIR.mkdir(exist_ok=True)
+
+CANVAS_W, CANVAS_H = 1280, 720
+OVERLAY_FPS = 5
+
+
+def _alive(proc):
+    return proc is not None and proc.poll() is None
+
+
+def _load_layers():
+    try:
+        with open(STATE_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except (OSError, ValueError):
+        return []
+
+
+def _save_layers(layers):
+    tmp = STATE_PATH.with_suffix(".tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(layers, f, ensure_ascii=False)
+    os.replace(tmp, STATE_PATH)
+
+
+def _font(size, bold=False):
+    candidates = [
+        BASE_DIR / "fonts" / ("Roboto-Bold.ttf" if bold else "Roboto-Regular.ttf"),
+        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            try:
+                return ImageFont.truetype(str(candidate), size=size)
+            except OSError:
+                pass
+    return ImageFont.load_default()
+
+
+def _rgba(hex_color, alpha=255):
+    value = (hex_color or "#FFFFFF").lstrip("#")
+    try:
+        rgb = tuple(int(value[i:i+2], 16) for i in (0, 2, 4))
+        return (*rgb, int(alpha))
+    except Exception:
+        return (255, 255, 255, int(alpha))
+
+
+def _compose_overlay(layers):
+    canvas = Image.new("RGBA", (CANVAS_W, CANVAS_H), (0, 0, 0, 0))
+    now = time.time()
+    for layer in layers:
+        if not layer.get("visible", True):
+            continue
+        kind = layer.get("type")
+        x = int(layer.get("x", 40))
+        y = int(layer.get("y", 40))
+        try:
+            if kind == "photo":
+                path = Path(layer.get("path", ""))
+                if not path.exists():
+                    continue
+                with Image.open(path) as source:
+                    image = source.convert("RGBA")
+                max_w = max(20, min(900, int(layer.get("width", 260))))
+                max_h = max(20, min(600, int(layer.get("height", 180))))
+                image.thumbnail((max_w, max_h), Image.Resampling.LANCZOS)
+                opacity = max(0, min(100, int(layer.get("opacity", 100))))
+                if opacity < 100:
+                    alpha = image.getchannel("A").point(lambda p: int(p * opacity / 100))
+                    image.putalpha(alpha)
+                canvas.alpha_composite(image, (x, y))
+
+            elif kind in ("text", "banner", "ticker"):
+                draw = ImageDraw.Draw(canvas)
+                text = str(layer.get("text", ""))[:500]
+                size = max(12, min(100, int(layer.get("font_size", 36))))
+                font = _font(size, bold=True)
+                color = _rgba(layer.get("color", "#FFFFFF"))
+                if kind == "ticker":
+                    # Smooth left-to-right repeat across the bottom ticker area.
+                    box_h = max(48, size + 28)
+                    draw.rectangle((0, CANVAS_H-box_h, CANVAS_W, CANVAS_H), fill=_rgba(layer.get("background", "#111827"), 235))
+                    bbox = draw.textbbox((0, 0), text, font=font)
+                    text_w = max(1, bbox[2] - bbox[0])
+                    travel = CANVAS_W + text_w
+                    tx = CANVAS_W - int((now * max(40, int(layer.get("speed", 100)))) % travel)
+                    draw.text((tx, CANVAS_H-box_h + (box_h-size)//2 - bbox[1]), text, font=font, fill=color)
+                elif kind == "banner":
+                    pad_x, pad_y = 22, 14
+                    bbox = draw.textbbox((0, 0), text, font=font)
+                    tw, th = bbox[2]-bbox[0], bbox[3]-bbox[1]
+                    box_w = min(CANVAS_W-x, tw + pad_x*2)
+                    box_h = th + pad_y*2
+                    bg = _rgba(layer.get("background", "#111827"), int(layer.get("background_opacity", 230)))
+                    draw.rounded_rectangle((x, y, x+box_w, y+box_h), radius=12, fill=bg)
+                    draw.text((x+pad_x, y+pad_y-bbox[1]), text, font=font, fill=color)
+                else:
+                    draw.text((x, y), text, font=font, fill=color)
+        except Exception:
+            # A malformed/removed layer must not terminate the live stream.
+            continue
+    return canvas
+
+
+def _overlay_writer(proc, stop_event):
+    """Feed transparent RGBA overlay frames to FFmpeg; reads updated layer state each frame."""
+    frame_bytes = CANVAS_W * CANVAS_H * 4
+    interval = 1.0 / OVERLAY_FPS
+    try:
+        while not stop_event.is_set() and proc.poll() is None:
+            started = time.time()
+            layers = _load_layers()
+            frame = _compose_overlay(layers)
+            raw = frame.tobytes()
+            if len(raw) != frame_bytes:
+                continue
+            proc.stdin.write(raw)
+            proc.stdin.flush()
+            delay = interval - (time.time() - started)
+            if delay > 0:
+                stop_event.wait(delay)
+    except (BrokenPipeError, OSError, ValueError):
+        pass
+    finally:
+        try:
+            if proc.stdin and not proc.stdin.closed:
+                proc.stdin.close()
+        except Exception:
+            pass
+
+
+def _stop_stream():
+    proc = st.session_state.get("stream_process")
+    event = st.session_state.get("overlay_stop_event")
+    if event:
+        event.set()
+    if _alive(proc):
+        proc.terminate()
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=5)
+    st.session_state.stream_process = None
+    st.session_state.overlay_thread = None
+    st.session_state.overlay_stop_event = None
+
+
+def _add_layer(layer):
+    layers = _load_layers()
+    layer["id"] = uuid.uuid4().hex[:8]
+    layer["visible"] = True
+    layers.append(layer)
+    _save_layers(layers)
+
+
+def _render_graphics_studio():
+    st.markdown("---")
+    st.header("🎨 Live Graphics & Overlay Studio")
+    st.caption("Yahan add ki gayi graphics running stream par overlay hoti hain. Changes live apply hoti hain; stream restart ki zaroorat nahi.")
+    layers = _load_layers()
+
+    with st.expander("🖼️ Photo / Logo add karein", expanded=False):
+        photo = st.file_uploader("PNG / JPG / WEBP image", type=["png", "jpg", "jpeg", "webp"], key="overlay_photo")
+        c1, c2, c3 = st.columns(3)
+        px = c1.number_input("X position", 0, CANVAS_W-1, 40, key="photo_x")
+        py = c2.number_input("Y position", 0, CANVAS_H-1, 40, key="photo_y")
+        pw = c3.slider("Width", 40, 900, 260, key="photo_width")
+        opacity = st.slider("Photo opacity", 10, 100, 100, key="photo_opacity")
+        if st.button("＋ Add Photo / Logo", key="add_photo"):
+            if photo is None:
+                st.warning("Pehle image upload karein.")
+            else:
+                ext = Path(photo.name).suffix.lower()
+                if ext not in (".png", ".jpg", ".jpeg", ".webp"):
+                    st.error("Unsupported image format.")
+                else:
+                    asset_path = ASSET_DIR / f"{uuid.uuid4().hex}{ext}"
+                    asset_path.write_bytes(photo.getbuffer())
+                    _add_layer({"type":"photo","name":photo.name,"path":str(asset_path),"x":int(px),"y":int(py),"width":int(pw),"height":600,"opacity":int(opacity)})
+                    st.success("Photo/logo live graphics mein add ho gaya.")
+                    st.rerun()
+
+    with st.expander("✍️ Text add karein", expanded=False):
+        txt = st.text_input("Text", max_chars=180, key="overlay_text")
+        c1, c2, c3 = st.columns(3)
+        tx = c1.number_input("X", 0, CANVAS_W-1, 60, key="text_x")
+        ty = c2.number_input("Y", 0, CANVAS_H-1, 60, key="text_y")
+        fs = c3.slider("Font size", 14, 90, 36, key="text_size")
+        color = st.color_picker("Text color", "#FFFFFF", key="text_color")
+        if st.button("＋ Add Text", key="add_text"):
+            if txt.strip():
+                _add_layer({"type":"text","name":txt[:32],"text":txt,"x":int(tx),"y":int(ty),"font_size":int(fs),"color":color})
+                st.success("Text live stream par add ho gaya.")
+                st.rerun()
+            else:
+                st.warning("Text enter karein.")
+
+    with st.expander("📢 Banner / Lower Third add karein", expanded=False):
+        banner_text = st.text_input("Banner text", max_chars=180, key="banner_text")
+        c1, c2, c3 = st.columns(3)
+        bx = c1.number_input("Banner X", 0, CANVAS_W-1, 40, key="banner_x")
+        by = c2.number_input("Banner Y", 0, CANVAS_H-1, 520, key="banner_y")
+        bfs = c3.slider("Banner font size", 14, 64, 30, key="banner_size")
+        bc = st.color_picker("Banner text color", "#FFFFFF", key="banner_color")
+        bg = st.color_picker("Banner background", "#B91C1C", key="banner_bg")
+        if st.button("＋ Add Banner", key="add_banner"):
+            if banner_text.strip():
+                _add_layer({"type":"banner","name":banner_text[:32],"text":banner_text,"x":int(bx),"y":int(by),"font_size":int(bfs),"color":bc,"background":bg,"background_opacity":230})
+                st.success("Banner live stream par add ho gaya.")
+                st.rerun()
+            else:
+                st.warning("Banner text enter karein.")
+
+    with st.expander("📜 Scrolling ticker add karein", expanded=False):
+        ticker_text = st.text_input("Ticker announcement", max_chars=250, key="ticker_text")
+        c1, c2, c3 = st.columns(3)
+        tfs = c1.slider("Ticker font size", 16, 54, 28, key="ticker_size")
+        tc = c2.color_picker("Ticker text color", "#FFFFFF", key="ticker_color")
+        tb = c3.color_picker("Ticker background", "#111827", key="ticker_bg")
+        speed = st.slider("Ticker speed", 40, 240, 100, key="ticker_speed")
+        if st.button("＋ Add Scrolling Ticker", key="add_ticker"):
+            if ticker_text.strip():
+                _add_layer({"type":"ticker","name":ticker_text[:32],"text":ticker_text,"font_size":int(tfs),"color":tc,"background":tb,"speed":int(speed)})
+                st.success("Scrolling ticker live ho gaya.")
+                st.rerun()
+            else:
+                st.warning("Ticker text enter karein.")
+
+    st.markdown("**Active graphics layers**")
+    if not layers:
+        st.info("Abhi koi overlay nahi. Upar se photo, text, banner ya ticker add karein.")
+    for layer in layers:
+        with st.container(border=True):
+            c1, c2, c3 = st.columns([5, 2, 2])
+            c1.write(f"**{layer.get('type','layer').title()}** · {layer.get('name','')}")
+            visible = c2.checkbox("Visible", value=bool(layer.get("visible", True)), key=f"vis_{layer['id']}")
+            if visible != bool(layer.get("visible", True)):
+                layer["visible"] = visible
+                _save_layers(layers)
+            if c3.button("Remove", key=f"remove_{layer['id']}"):
+                if layer.get("type") == "photo":
+                    try:
+                        Path(layer.get("path","")).unlink(missing_ok=True)
+                    except Exception:
+                        pass
+                layers = [item for item in _load_layers() if item.get("id") != layer["id"]]
+                _save_layers(layers)
+                st.rerun()
+
+            with st.expander("Edit position / style", expanded=False):
+                with st.form(f"edit_layer_{layer['id']}"):
+                    e1, e2, e3 = st.columns(3)
+                    ex = e1.number_input("X", 0, CANVAS_W-1, int(layer.get("x", 40)), key=f"edit_x_{layer['id']}")
+                    ey = e2.number_input("Y", 0, CANVAS_H-1, int(layer.get("y", 40)), key=f"edit_y_{layer['id']}")
+                    if layer.get("type") == "photo":
+                        ew = e3.slider("Width", 40, 900, max(40, min(900, int(layer.get("width", 260)))), key=f"edit_w_{layer['id']}")
+                        eo = st.slider("Opacity", 10, 100, max(10, min(100, int(layer.get("opacity", 100)))), key=f"edit_o_{layer['id']}")
+                    elif layer.get("type") == "ticker":
+                        ew = e3.slider("Scroll speed", 40, 240, max(40, min(240, int(layer.get("speed", 100)))), key=f"edit_speed_{layer['id']}")
+                        eo = st.slider("Font size", 16, 54, max(16, min(54, int(layer.get("font_size", 28)))), key=f"edit_fs_{layer['id']}")
+                    else:
+                        ew = e3.slider("Font size", 14, 90, max(14, min(90, int(layer.get("font_size", 36)))), key=f"edit_fs_{layer['id']}")
+                        eo = None
+                    new_text = None
+                    if layer.get("type") in ("text", "banner", "ticker"):
+                        new_text = st.text_input("Text", value=layer.get("text", ""), key=f"edit_text_{layer['id']}")
+                    if st.form_submit_button("Apply changes"):
+                        layer["x"], layer["y"] = int(ex), int(ey)
+                        if layer.get("type") == "photo":
+                            layer["width"], layer["opacity"] = int(ew), int(eo)
+                        elif layer.get("type") == "ticker":
+                            layer["speed"], layer["font_size"] = int(ew), int(eo)
+                        else:
+                            layer["font_size"] = int(ew)
+                        if new_text is not None:
+                            layer["text"] = new_text
+                            layer["name"] = new_text[:32]
+                        _save_layers(layers)
+                        st.success("Changes live apply ho gayi hain.")
+                        st.rerun()
+    if layers and st.button("Clear all graphics", key="clear_all_graphics"):
+        for layer in layers:
+            if layer.get("type") == "photo":
+                try:
+                    Path(layer.get("path","")).unlink(missing_ok=True)
+                except Exception:
+                    pass
+        _save_layers([])
+        st.rerun()
+    st.caption("Overlay canvas: 1280×720, transparent background. Photo/logo ko add karte waqt position aur width set karein.")
+    st.markdown("**Graphics preview**")
+    st.image(_compose_overlay(_load_layers()), caption="Transparent overlay preview (actual video ke upar composite hota hai)", use_container_width=True)
+
+
 def render_streaming_page():
     st.title("📡 Live Streaming Dashboard")
     st.caption("MP4 video ko FFmpeg ke zariye YouTube Live RTMP par stream karein.")
-    st.warning("Yeh mode FFmpeg ko isi Streamlit server par chalata hai. Streamlit Community Cloud par app sleep/restart ya resource limits ki wajah se 3–4 ghantay ki reliability guaranteed nahi. Reliable long-running streaming ke liye persistent worker chahiye.")
-    proc=st.session_state.get("stream_process")
-    if _alive(proc):
-        st.success("FFmpeg process chal raha hai.")
-        if st.button("⏹ Stop Streaming",type="primary",use_container_width=True):
-            proc.terminate()
-            try: proc.wait(timeout=10)
-            except subprocess.TimeoutExpired: proc.kill()
-            st.session_state.stream_process=None; st.rerun()
+    st.warning("Long-running stream ki reliability hosting platform ke sleep/restart aur resource limits par depend karti hai. Persistent worker zyada reliable hota hai.")
+    proc = st.session_state.get("stream_process")
+    running = _alive(proc)
+
+    if running:
+        st.success("Live FFmpeg process chal raha hai.")
+        if st.button("⏹ Stop Streaming", type="primary", use_container_width=True):
+            _stop_stream()
+            st.rerun()
     else:
-        uploaded=st.file_uploader("MP4 video upload karein",type=["mp4"],key="stream_video")
-        server=st.text_input("YouTube Live Server URL",value="rtmp://a.rtmp.youtube.com/live2")
-        key=st.text_input("Stream Key",type="password",help="Is key ko private rakhein.")
-        hours=st.number_input("Stream duration (hours)",min_value=1,max_value=12,value=4,step=1)
-        quality=st.selectbox("Output quality",["1080p","720p","480p"])
-        profiles={"1080p":("1920:1080","4500k"),"720p":("1280:720","2500k"),"480p":("854:480","1200k")}
-        dims,rate=profiles[quality]
+        uploaded = st.file_uploader("MP4 video upload karein", type=["mp4"], key="stream_video")
+        server = st.text_input("YouTube Live Server URL", value="rtmp://a.rtmp.youtube.com/live2")
+        key = st.text_input("Stream Key", type="password", help="Is key ko private rakhein.")
+        hours = st.number_input("Stream duration (hours)", min_value=1, max_value=12, value=4, step=1)
+        quality = st.selectbox("Output quality", ["1080p", "720p", "480p"])
+        profiles = {"1080p": ("1920:1080", "4500k"), "720p": ("1280:720", "2500k"), "480p": ("854:480", "1200k")}
+        dims, rate = profiles[quality]
         st.caption(f"{quality} • H.264 video {rate} • AAC audio")
         st.caption("Upload limit config mein 2048 MB hai; hosting platform ki apni limits bhi apply ho sakti hain.")
-        if st.button("▶ Start Live Stream",type="primary",use_container_width=True):
-            if uploaded is None: st.error("Pehle MP4 video upload karein.")
-            elif not server.strip().startswith("rtmp"): st.error("Valid RTMP server URL enter karein.")
-            elif not key.strip(): st.error("YouTube Live stream key enter karein.")
+        if st.button("▶ Start Live Stream", type="primary", use_container_width=True):
+            if uploaded is None:
+                st.error("Pehle MP4 video upload karein.")
+            elif not server.strip().startswith("rtmp"):
+                st.error("Valid RTMP server URL enter karein.")
+            elif not key.strip():
+                st.error("YouTube Live stream key enter karein.")
             else:
-                path=os.path.join(STREAM_DIR,"live_input.mp4")
-                with open(path,"wb") as f: f.write(uploaded.getbuffer())
-                target=server.rstrip("/")+"/"+key.strip()
-                vf=f"scale={dims}:force_original_aspect_ratio=decrease,pad={dims}:(ow-iw)/2:(oh-ih)/2"
-                cmd=["ffmpeg","-hide_banner","-loglevel","warning","-re","-stream_loop","-1","-i",path,"-t",str(int(hours*3600)),"-vf",vf,"-r","30","-c:v","libx264","-preset","veryfast","-b:v",rate,"-maxrate",rate,"-bufsize",rate,"-pix_fmt","yuv420p","-c:a","aac","-b:a","128k","-ar","44100","-f","flv",target]
+                path = STREAM_DIR / "live_input.mp4"
+                path.write_bytes(uploaded.getbuffer())
+                _save_layers([])  # start with a clean graphics canvas
+                target = server.rstrip("/") + "/" + key.strip()
+                stop_event = threading.Event()
+                vf = f"scale={dims}:force_original_aspect_ratio=decrease,pad={dims}:(ow-iw)/2:(oh-ih)/2"
+                cmd = [
+                    "ffmpeg", "-hide_banner", "-loglevel", "warning",
+                    "-re", "-stream_loop", "-1", "-i", str(path),
+                    "-re", "-thread_queue_size", "512",
+                    "-f", "rawvideo", "-pix_fmt", "rgba",
+                    "-video_size", f"{CANVAS_W}x{CANVAS_H}",
+                    "-framerate", str(OVERLAY_FPS), "-i", "pipe:0",
+                    "-filter_complex",
+                    f"[0:v]{vf}[base];[1:v]scale={dims}:flags=fast_bilinear[ov];[base][ov]overlay=0:0:format=auto:shortest=0[v]",
+                    "-map", "[v]", "-map", "0:a?",
+                    "-t", str(int(hours * 3600)), "-r", "30",
+                    "-c:v", "libx264", "-preset", "veryfast",
+                    "-b:v", rate, "-maxrate", rate, "-bufsize", rate,
+                    "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k",
+                    "-ar", "44100", "-f", "flv", target
+                ]
                 try:
-                    st.session_state.stream_process=subprocess.Popen(cmd,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-                    st.success("FFmpeg process start ho gaya. YouTube Studio mein stream status verify karein."); st.rerun()
-                except FileNotFoundError: st.error("FFmpeg server par available nahi. packages.txt check karein.")
-                except Exception as e: st.error(f"Stream start nahi ho saki: {e}")
+                    process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, bufsize=0)
+                    st.session_state.stream_process = process
+                    st.session_state.overlay_stop_event = stop_event
+                    writer = threading.Thread(target=_overlay_writer, args=(process, stop_event), daemon=True)
+                    writer.start()
+                    st.session_state.overlay_thread = writer
+                    st.success("Stream start ho gayi. YouTube Studio mein Live status verify karein.")
+                    st.rerun()
+                except FileNotFoundError:
+                    st.error("FFmpeg server par available nahi. packages.txt check karein.")
+                except Exception as e:
+                    st.error(f"Stream start nahi ho saki: {e}")
+
+    if running:
+        _render_graphics_studio()
     st.markdown("---")
-    st.markdown("**Start se pehle:** YouTube Studio se Live Streaming enable karke RTMP server aur stream key lein. Key private rakhein. Uploaded video repeat hogi jab tak selected duration poori na ho.")
+    st.markdown("**Start se pehle:** YouTube Studio se Live Streaming enable karke RTMP server aur stream key lein. Key private rakhein. Uploaded video selected duration tak repeat hogi.")
