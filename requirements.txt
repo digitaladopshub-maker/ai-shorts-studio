@@ -1,5 +1,6 @@
 streamlit
 yt-dlp[default]
+deno>=2.3.0
 openai-whisper
 opencv-python-headless==4.10.0.84
 Pillow

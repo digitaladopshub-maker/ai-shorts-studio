@@ -14,6 +14,7 @@ from subtitle_engine import get_subtitle_styling, get_subtitle_preset_config
 from face_tracker import sample_face_track, build_crop_expressions
 from multi_face_tracker import sample_active_face_track
 from ai_engine.viral_detector import rank_transcript_segments
+from youtube_downloader import download_video_from_url, get_deno_runtime
 
 
 def render_clipping_page():
@@ -210,47 +211,38 @@ def render_clipping_page():
                         if os.path.exists(video_path):
                             os.remove(video_path)
 
-                        # Use the yt-dlp module from the active Streamlit Python
-                        # environment, and explicitly register Node.js for YouTube's
-                        # JavaScript challenge / signature solving.
-                        common_args = [
-                            sys.executable, "-m", "yt_dlp",
-                            "--no-check-certificates", "--geo-bypass",
-                            "--js-runtimes", "node",
-                            "--remote-components", "ejs:npm",
-                            "--no-warnings",
-                            "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-                            "-o", video_path,
-                        ]
-                        result = subprocess.run(
-                            common_args + [video_url], capture_output=True, text=True
-                        )
-
-                        if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-                            st.success("Video Successfully Downloaded & Saved!")
-                            st.rerun()
+                        # yt-dlp's EJS npm component requires Deno or Bun, not Node.
+                        # The deno Python package supplies a current Deno binary and
+                        # yt-dlp[default] installs the matching yt-dlp-ejs scripts.
+                        deno_runtime = get_deno_runtime()
+                        if not deno_runtime:
+                            st.error("YouTube downloader runtime missing. Please check that requirements.txt installed the deno package.")
                         else:
-                            # A second YouTube client can help when the default
-                            # player client is temporarily blocked. Keep the same
-                            # JS runtime and EJS challenge solver enabled.
-                            fallback_args = [
-                                sys.executable, "-m", "yt_dlp",
-                                "--no-check-certificates", "--geo-bypass",
-                                "--js-runtimes", "node",
-                                "--remote-components", "ejs:npm",
-                                "--extractor-args", "youtube:player_client=android",
-                                "-o", video_path, video_url,
-                            ]
-                            fallback_result = subprocess.run(
-                                fallback_args, capture_output=True, text=True
+                            result = download_video_from_url(
+                                video_url, video_path, deno_runtime, fallback=False
                             )
-                            if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-                                st.success("Video Downloaded via Fallback & Saved!")
+
+                            if result.returncode == 0 and os.path.exists(video_path) and os.path.getsize(video_path) > 0:
+                                st.success("Video Successfully Downloaded & Saved!")
                                 st.rerun()
                             else:
-                                st.error("Download failed! Detailed Error:")
-                                error_text = (fallback_result.stderr or result.stderr or "Unknown error occurred during download.")
-                                st.code(error_text[-1800:])
+                                # Retry with YouTube's web_safari player client. Keep
+                                # the same Deno runtime and bundled EJS solver.
+                                fallback_result = download_video_from_url(
+                                    video_url, video_path, deno_runtime, fallback=True
+                                )
+                                if fallback_result.returncode == 0 and os.path.exists(video_path) and os.path.getsize(video_path) > 0:
+                                    st.success("Video Downloaded via Fallback & Saved!")
+                                    st.rerun()
+                                else:
+                                    st.error("Download failed! Detailed Error:")
+                                    error_text = (
+                                        (fallback_result.stderr or "") + "\n" +
+                                        (fallback_result.stdout or "") + "\n" +
+                                        (result.stderr or "") + "\n" +
+                                        (result.stdout or "")
+                                    ).strip() or "Unknown error occurred during download."
+                                    st.code(error_text[-2400:])
 
             elif option == "Upload MP4 File":
                 uploaded_file = st.file_uploader("Upload MP4 File", type=["mp4"])
