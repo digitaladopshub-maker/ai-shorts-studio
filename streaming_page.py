@@ -385,47 +385,119 @@ def _render_graphics_studio():
 
 
 def _render_account_manager():
-    st.subheader("🔐 Saved Streaming Accounts")
-    st.caption("Keys encrypted form mein save hoti hain. Encryption key Streamlit Secrets mein configure karna zaroori hai.")
-    if not _encryption_key():
-        st.warning("Keys save karne ke liye Streamlit app ke Secrets mein STREAM_KEY_ENCRYPTION_KEY add karein. Fernet key locally generate kar sakte hain: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\"")
+    st.subheader("Streaming Accounts")
+    st.caption("Apne channels aur pages save karein. Har account ko baad mein edit bhi kar sakte hain.")
+
     profiles = _load_profiles()
-    with st.expander("＋ Add / Edit streaming account", expanded=not bool(profiles)):
-        existing_names = [p.get("name", "") for p in profiles]
-        choice = st.selectbox("Existing account edit karein ya new account banayein", ["＋ New account"] + existing_names, key="profile_choice")
-        current = next((p for p in profiles if p.get("name") == choice), {}) if choice != "＋ New account" else {}
-        with st.form("stream_profile_form"):
-            name = st.text_input("Account / channel name", value=current.get("name", ""))
-            platform = st.selectbox("Platform", list(PLATFORMS), index=list(PLATFORMS).index(current.get("platform", "YouTube")) if current.get("platform") in PLATFORMS else 0)
-            default_server = current.get("server", PLATFORMS.get(platform, ""))
-            server = st.text_input("RTMP Server URL", value=default_server)
-            stream_key = st.text_input("Stream Key", value=current.get("key", ""), type="password")
-            save = st.form_submit_button("Save account securely")
-        if save:
-            if not name.strip() or not server.strip().startswith(("rtmp://", "rtmps://")) or not stream_key.strip():
-                st.error("Account name, valid RTMP URL aur Stream Key zaroori hain.")
-            else:
-                updated = [p for p in profiles if p.get("name") != name.strip() and p.get("name") != choice]
-                updated.append({"id": current.get("id", uuid.uuid4().hex[:10]), "name": name.strip(), "platform": platform, "server": server.strip(), "key": stream_key.strip()})
-                try:
-                    _save_profiles(updated)
-                    st.success("Account encrypted form mein save ho gaya.")
-                    st.rerun()
-                except Exception as exc:
-                    st.error(str(exc))
-    if profiles:
-        for profile in profiles:
-            with st.container(border=True):
-                a, b = st.columns([5, 1])
-                a.markdown(f"**{profile['name']}** · {profile['platform']}")
-                a.caption(profile.get("server", ""))
-                if b.button("Delete", key=f"delete_profile_{profile['id']}"):
+    # Draft cards are held in the Streamlit session until each account is saved.
+    drafts_key = "stream_account_drafts"
+    if drafts_key not in st.session_state:
+        st.session_state[drafts_key] = []
+
+    if not _encryption_key():
+        st.info("Accounts save karne ke liye app administrator ko secure encryption key configure karni hogi.")
+
+    def account_editor(profile, is_new=False, index=0):
+        pid = profile.get("id") or f"new_{index}"
+        title = "New account" if is_new else profile.get("name", f"Account {index + 1}")
+        with st.container(border=True):
+            top_left, top_right = st.columns([5, 1])
+            top_left.markdown(f"**{title}**")
+            if not is_new:
+                top_right.caption(profile.get("platform", ""))
+            with st.form(f"stream_account_form_{pid}"):
+                name = st.text_input(
+                    "Account / Channel Name",
+                    value=profile.get("name", ""),
+                    placeholder="e.g. My YouTube Channel",
+                    key=f"account_name_{pid}",
+                )
+                platform_options = list(PLATFORMS)
+                old_platform = profile.get("platform", "YouTube")
+                platform_index = platform_options.index(old_platform) if old_platform in platform_options else 0
+                platform = st.selectbox(
+                    "Platform",
+                    platform_options,
+                    index=platform_index,
+                    key=f"account_platform_{pid}",
+                )
+                server_default = profile.get("server") or PLATFORMS.get(platform, "")
+                server = st.text_input(
+                    "RTMP Server URL",
+                    value=server_default,
+                    placeholder="rtmp://...",
+                    key=f"account_server_{pid}",
+                )
+                stream_key = st.text_input(
+                    "Stream Key",
+                    value=profile.get("key", ""),
+                    type="password",
+                    placeholder="Enter stream key",
+                    key=f"account_key_{pid}",
+                )
+                submitted = st.form_submit_button("Save Account", type="primary", use_container_width=True)
+            if submitted:
+                if not name.strip():
+                    st.error("Account / Channel Name enter karein.")
+                elif not server.strip().startswith(("rtmp://", "rtmps://")):
+                    st.error("Valid RTMP Server URL enter karein.")
+                elif not stream_key.strip():
+                    st.error("Stream Key enter karein.")
+                else:
+                    updated_profile = {
+                        "id": profile.get("id") or uuid.uuid4().hex[:10],
+                        "name": name.strip(),
+                        "platform": platform,
+                        "server": server.strip(),
+                        "key": stream_key.strip(),
+                    }
+                    updated = [p for p in profiles if p.get("id") != updated_profile["id"]]
+                    updated.append(updated_profile)
+                    try:
+                        _save_profiles(updated)
+                        st.session_state[drafts_key] = [
+                            d for d in st.session_state[drafts_key]
+                            if d.get("_draft_id") != profile.get("_draft_id")
+                        ]
+                        st.success(f"{name.strip()} saved successfully.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Account save nahi ho saka: {exc}")
+
+            if not is_new:
+                if st.button("Delete Account", key=f"delete_account_{pid}", type="secondary"):
                     try:
                         _save_profiles([p for p in profiles if p.get("id") != profile.get("id")])
                         st.rerun()
                     except Exception as exc:
-                        st.error(str(exc))
+                        st.error(f"Account delete nahi ho saka: {exc}")
 
+    # Show the first account editor immediately, without hiding it in an expander.
+    if profiles:
+        for index, profile in enumerate(profiles):
+            account_editor(profile, is_new=False, index=index)
+    else:
+        account_editor(
+            {"id": None, "name": "", "platform": "YouTube",
+             "server": PLATFORMS.get("YouTube", ""), "key": ""},
+            is_new=True,
+            index=0,
+        )
+
+    # New account forms appear below the existing account(s).
+    for index, draft in enumerate(st.session_state[drafts_key]):
+        account_editor(draft, is_new=True, index=index + 1)
+
+    if st.button("＋ Add Other Account", key="add_other_stream_account", use_container_width=True):
+        st.session_state[drafts_key].append({
+            "_draft_id": uuid.uuid4().hex[:10],
+            "id": None,
+            "name": "",
+            "platform": "YouTube",
+            "server": PLATFORMS.get("YouTube", ""),
+            "key": "",
+        })
+        st.rerun()
 
 def render_streaming_page():
     st.title("📡 Live Streaming Dashboard")
