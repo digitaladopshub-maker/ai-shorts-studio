@@ -363,7 +363,7 @@ def _render_graphics_studio():
 
 
 def _render_account_manager():
-    """Simple session-only destination slots: platform, stream key, active toggle."""
+    """Clean session-only destination cards with editable platform ingest URLs."""
     st.subheader("Streaming Platforms")
     slots_key = "stream_destination_slots"
     if slots_key not in st.session_state:
@@ -371,30 +371,50 @@ def _render_account_manager():
 
     slots = st.session_state[slots_key]
     active_profiles = []
-    st.markdown("<div class='destination-panel'>", unsafe_allow_html=True)
     for index, slot in enumerate(slots):
         sid = slot["id"]
+        old_platform = slot.get("platform", "YouTube")
+        platform_options = list(PLATFORMS)
         with st.container(border=True):
-            c1, c2 = st.columns([3, 1])
-            platform_options = list(PLATFORMS)
-            old_platform = slot.get("platform", "YouTube")
-            platform = c1.selectbox(
+            top_left, top_right = st.columns([3.2, 1])
+            platform = top_left.selectbox(
                 f"Platform {index + 1}", platform_options,
                 index=platform_options.index(old_platform) if old_platform in platform_options else 0,
                 key=f"dest_platform_{sid}"
             )
-            active = c2.toggle("Active", value=bool(slot.get("active", False)), key=f"dest_active_{sid}")
-            # Platform server is selected automatically and is not shown as a confusing editable field.
+            active = top_right.toggle("Send to this platform", value=bool(slot.get("active", False)), key=f"dest_active_{sid}")
+
+            # A changed destination must not accidentally reuse the previous platform's key.
+            if platform != old_platform:
+                st.session_state[f"dest_key_{sid}"] = ""
+                st.session_state[f"dest_server_{sid}"] = PLATFORMS.get(platform, "")
+                slot["key"] = ""
+
+            default_server = PLATFORMS.get(platform, "")
+            if platform == old_platform:
+                server_value = slot.get("server") or default_server
+            else:
+                server_value = default_server
+
+            if platform in ("Facebook", "TikTok", "Custom RTMP"):
+                server = st.text_input(
+                    "Server URL", value=server_value,
+                    placeholder="Facebook Live Producer se URL paste karein" if platform == "Facebook" else "rtmp:// ya rtmps:// server URL",
+                    key=f"dest_server_{sid}"
+                )
+                if platform == "Facebook":
+                    st.caption("Live Producer ka exact Server URL use karein. Preview aane par Facebook mein Go Live press karein.")
+                elif platform == "TikTok":
+                    st.caption("TikTok account ke LIVE Center se mila hua RTMP URL paste karein.")
+            else:
+                server = default_server
+
             stream_key = st.text_input(
                 "Stream Key", value=slot.get("key", ""), type="password",
-                placeholder="Paste this platform's stream key", key=f"dest_key_{sid}"
+                placeholder="Yahan Stream Key paste karein", key=f"dest_key_{sid}"
             )
-            if platform == "Custom RTMP":
-                server = st.text_input("RTMP Server URL", value=slot.get("server", ""),
-                                       placeholder="rtmp:// or rtmps://", key=f"dest_server_{sid}")
-            else:
-                server = PLATFORMS.get(platform, "")
             slot.update({"platform": platform, "key": stream_key, "active": active, "server": server})
+
             if active:
                 if stream_key.strip() and server.strip().startswith(("rtmp://", "rtmps://")):
                     active_profiles.append({
@@ -402,30 +422,41 @@ def _render_account_manager():
                         "server": server.strip(), "key": stream_key.strip()
                     })
                 else:
-                    st.warning("Active karne ke liye valid Stream Key enter karein." if platform != "Custom RTMP" else "Custom RTMP ke liye URL aur Stream Key dono enter karein.")
-    st.markdown("</div>", unsafe_allow_html=True)
-    # When the newest slot is activated with a valid key, automatically reveal the next empty slot.
+                    st.warning("Is platform ko ON karne ke liye valid Server URL aur Stream Key enter karein.")
+
+    # Show a fresh empty card after the last destination is activated and configured.
     if slots and slots[-1].get("active") and slots[-1].get("key", "").strip() and slots[-1].get("server", "").strip().startswith(("rtmp://", "rtmps://")):
         slots.append({"id": f"slot_{uuid.uuid4().hex[:8]}", "platform": "YouTube", "key": "", "active": False})
     st.session_state[slots_key] = slots
     _save_profiles(active_profiles)
 
-    if st.button("＋ Add Another Platform", key="add_destination_slot", use_container_width=True):
-        slots.append({"id": f"slot_{uuid.uuid4().hex[:8]}", "platform": "YouTube", "key": "", "active": False})
-        st.session_state[slots_key] = slots
-        st.rerun()
+    left, center, right = st.columns([1, 1.4, 1])
+    with center:
+        if st.button("＋ Add Platform", key="add_destination_slot", use_container_width=True):
+            slots.append({"id": f"slot_{uuid.uuid4().hex[:8]}", "platform": "YouTube", "key": "", "active": False})
+            st.session_state[slots_key] = slots
+            st.rerun()
 
 
 def render_streaming_page():
     st.markdown("""<style>
-    .stApp, [data-testid="stAppViewContainer"] { background: #080b12; color: #f3f4f6; }
-    [data-testid="stHeader"] { background: rgba(8,11,18,0.95); }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    html, body, [class*="css"], .stApp { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+    .stApp, [data-testid="stAppViewContainer"] { background: #080b12; color: #f4f7fb; }
+    [data-testid="stHeader"] { background: rgba(8,11,18,0.96); }
     [data-testid="stSidebar"] { background: #05070c; }
-    [data-testid="stVerticalBlockBorderWrapper"] > div { background: #101722; border-color: #263244; border-radius: 14px; }
-    div[data-testid="stTextInput"] input, div[data-testid="stSelectbox"] div,
-    div[data-testid="stNumberInput"] input { background: #111827; color: #f9fafb; }
-    div.stButton > button[kind="primary"] { background: #2563eb; border: 0; }
-    .destination-panel { margin-bottom: 8px; }
+    [data-testid="stVerticalBlockBorderWrapper"] > div { background: linear-gradient(145deg,#111a29,#0d1420); border: 1px solid #2b3a50; border-radius: 16px; }
+    [data-testid="stWidgetLabel"] p, [data-testid="stWidgetLabel"] label,
+    [data-testid="stMarkdownContainer"] p, .stCaption, label { color: #e2e8f0 !important; }
+    [data-testid="stWidgetLabel"] p { font-weight: 600 !important; font-size: .92rem !important; }
+    div[data-testid="stTextInput"] input, div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+    div[data-testid="stNumberInput"] input { background: #111c2c !important; color: #f8fafc !important; border-color: #40516b !important; border-radius: 10px !important; }
+    input::placeholder { color: #91a0b5 !important; opacity: 1 !important; }
+    div[data-testid="stTextInput"] input:focus, div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:focus-within { border-color: #60a5fa !important; box-shadow: 0 0 0 1px #60a5fa !important; }
+    div.stButton > button { border-radius: 11px; min-height: 2.6rem; font-weight: 650; border: 1px solid #3b82f6; background: #1d4ed8; color: #fff; padding: .45rem 1.2rem; }
+    div.stButton > button:hover { background: #2563eb; border-color: #60a5fa; color: #fff; }
+    div[data-testid="stToggle"] label { color: #e2e8f0 !important; font-weight: 600; }
+    h1, h2, h3 { color: #f8fafc !important; letter-spacing: -.025em; }
     </style>""", unsafe_allow_html=True)
     st.title("📡 Live Streaming Studio")
     _render_account_manager()
@@ -473,7 +504,7 @@ def render_streaming_page():
                         pass
                     vf = f"scale={dims}:force_original_aspect_ratio=decrease,pad={dims}:(ow-iw)/2:(oh-ih)/2"
                     cmd = [
-                        "ffmpeg", "-hide_banner", "-loglevel", "warning",
+                        "ffmpeg", "-hide_banner", "-loglevel", "info",
                         "-re", "-stream_loop", "-1", "-i", str(path),
                         "-thread_queue_size", "64", "-f", "rawvideo", "-pix_fmt", "rgba",
                         "-video_size", f"{CANVAS_W}x{CANVAS_H}", "-framerate", str(OVERLAY_FPS), "-i", "pipe:0",
