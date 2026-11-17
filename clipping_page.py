@@ -1,0 +1,562 @@
+import streamlit as st
+import whisper
+import subprocess
+import os
+import shutil
+import textwrap
+import cv2
+import zipfile
+from PIL import Image, ImageDraw
+from fonts import get_pro_font, get_font_family
+from effects_engine import get_filter_ffmpeg_string, get_style_effect_ffmpeg_string
+from subtitle_engine import get_subtitle_styling
+
+
+def render_clipping_page():
+    st.markdown("""
+        <style>
+            .main-title { font-size: 26px; font-weight: 700; color: #111827; margin-bottom: 0px; }
+            .sub-text { font-size: 13px; color: #6b7280; margin-bottom: 15px; }
+            div.stButton > button:first-child { border-radius: 8px; font-weight: 600; }
+        </style>
+    """, unsafe_allow_html=True)
+
+    if 'frame_time' not in st.session_state:
+        st.session_state.frame_time = "0"
+
+    if 'reset_trigger' not in st.session_state:
+        st.session_state.reset_trigger = 0
+
+    if 'enable_face_tracking' not in st.session_state:
+        st.session_state.enable_face_tracking = False
+
+    if 'manual_offset_x' not in st.session_state:
+        st.session_state.manual_offset_x = 35
+
+    if 'manual_offset_y' not in st.session_state:
+        st.session_state.manual_offset_y = 50
+
+    if 'generated_clips' not in st.session_state:
+        st.session_state.generated_clips = []
+
+    DOWNLOAD_DIR = "downloads"
+    if not os.path.exists(DOWNLOAD_DIR):
+        os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+    # --- AUTO REGISTER FONTS TO SYSTEM FOR FFMPEG/LIBASS ---
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    LOCAL_FONT_DIR = os.path.join(BASE_DIR, "fonts")
+    USER_FONT_DIR = os.path.expanduser("~/.local/share/fonts")
+    os.makedirs(USER_FONT_DIR, exist_ok=True)
+
+    if os.path.exists(LOCAL_FONT_DIR):
+        for f_name in os.listdir(LOCAL_FONT_DIR):
+            if f_name.endswith(".ttf"):
+                src_p = os.path.join(LOCAL_FONT_DIR, f_name)
+                dst_p = os.path.join(USER_FONT_DIR, f_name)
+                if not os.path.exists(dst_p):
+                    shutil.copy(src_p, dst_p)
+
+    video_path = os.path.join(DOWNLOAD_DIR, "input_video.mp4")
+    bg_music_path = os.path.join(DOWNLOAD_DIR, "bg_music.mp3")
+
+    def detect_face_center(v_path, start_sec):
+        try:
+            cap = cv2.VideoCapture(v_path)
+            cap.set(cv2.CAP_PROP_POS_MSEC, int(start_sec) * 1000)
+            ret, frame = cap.read()
+            cap.release()
+            if not ret or frame is None:
+                return None
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+            if not os.path.exists(cascade_path):
+                return None
+            face_cascade = cv2.CascadeClassifier(cascade_path)
+            if face_cascade.empty():
+                return None
+            faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+            if len(faces) > 0:
+                x, y, w, h = faces[0]
+                return x + (w // 2)
+        except Exception:
+            return None
+        return None
+
+    # --- HEADER SECTION ---
+    st.markdown('<p class="main-title">AI Clipping</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-text">Transform your long video into multiple highlight reels—in just one click!</p>', unsafe_allow_html=True)
+
+    # --- MAIN LAYOUT SPLIT ---
+    col_left, col_right = st.columns([1.0, 1.3], gap="large")
+
+    with col_right:
+        # --- 1. OUTPUT FORMAT SECTION ---
+        fmt_col1, fmt_col2 = st.columns([1.2, 2.8])
+        with fmt_col1:
+            st.markdown("<h4 style='padding-top: 5px;'>Output Format</h4>", unsafe_allow_html=True)
+        with fmt_col2:
+            output_format = st.radio(
+                "Output Format Options", 
+                ["9:16 Vertical", "16:9 Landscape", "1:1 Square"], 
+                horizontal=True, 
+                label_visibility="collapsed"
+            )
+
+        if "9:16" in output_format:
+            scale_w, scale_h = 1080, 1920
+            crop_filter = "crop=ih*9/16:ih"
+            preview_scale_w, preview_scale_h = 270, 480
+        elif "16:9" in output_format:
+            scale_w, scale_h = 1920, 1080
+            crop_filter = "crop=iw:iw*9/16"
+            preview_scale_w, preview_scale_h = 480, 270
+        else: 
+            scale_w, scale_h = 1080, 1080
+            crop_filter = "crop=min(iw\\,ih):min(iw\\,ih)"
+            preview_scale_w, preview_scale_h = 350, 350
+
+        st.markdown("---")
+
+        # --- 2. SUBTITLE SETTING ---
+        st.markdown("### Subtitle")
+        enable_subs = st.checkbox("Add AI Subtitles to Video?", value=True)
+    
+        style_preset = st.selectbox("Subtitle Preset", [
+            "The Alex Hormozi Style", "Border Pop-Up", "Karaoke Highlight", "The Power Word Scale", 
+            "Glow & Shine Effect", "The Minimal Subtitle Block", "Apple Style Minimal", "The Gradient Premium Stack", 
+            "Real Estate Pro", "The 3D Viral Text", "Multiple Word Slide Up", "Typewriter Effect", 
+            "Flicker Text", "Wave In / Bounce", "Blur Fade In", "Auto-Emoji Pop", 
+            "TikTok Classic Style", "Sound Effects Bracket", "CapCut Auto Lyric Template", "The Cyberpunk Neon"
+        ], index=0)
+
+        s_col1, s_col2 = st.columns(2)
+        with s_col1:
+            font_choice = st.selectbox("Font", [
+                "AntonioZull-Brush",
+                "BebasNeue-Regular",
+                "Impact Club",
+                "Impact",
+                "Impactbrutas",
+                "IMPACTED",
+                "Impacted2.0",
+                "Impact-Extravagant",
+                "Interact",
+                "Montserrat-Italic-VariableFont_wght",
+                "Montserrat-VariableFont_wght",
+                "Popping-Cute",
+                "Roboto-Bold",
+                "Roboto-Regular",
+                "San Antonio Charros_personal_use_only"
+            ], index=2)
+        with s_col2:
+            caption_align = st.selectbox("Position", ["Bottom (Safe Zone)", "Middle-Center", "Top (Safe Zone)"], index=0)
+
+        s_col3, s_col4 = st.columns(2)
+        with s_col3:
+            font_size_option = st.selectbox("Font Size", ["Small (18px)", "Medium (24px - Rec)", "Large (32px)", "Extra Large (40px)"], index=1)
+            font_size_map = {"Small (18px)": 18, "Medium (24px - Rec)": 24, "Large (32px)": 32, "Extra Large (40px)": 40}
+            font_size = font_size_map[font_size_option]
+        with s_col4:
+            words_per_line_option = st.selectbox("Words Per Line", ["1 Word", "2 Words (Recommended)", "3 Words", "4 Words", "5 Words"], index=1)
+            wpl_map = {"1 Word": 1, "2 Words (Recommended)": 2, "3 Words": 3, "4 Words": 4, "5 Words": 5}
+            words_per_line = wpl_map[words_per_line_option]
+
+        st.markdown("---")
+
+        # --- 3. CLIPPING MODE ---
+        st.markdown("### Clipping Mode")
+        clip_mode = st.selectbox("Clipping Mode", ["Manual", "Auto-Split AI"], label_visibility="collapsed")
+    
+        clip_ranges = []
+        if clip_mode == "Manual":
+            num_clips = st.number_input("Short Clips Quantity", min_value=1, max_value=10, value=1)
+            for i in range(int(num_clips)):
+                c1, c2 = st.columns(2)
+                with c1:
+                    s_start = st.text_input(f"Clip {i+1} Start (s)", value=str(i*30), key=f"start_{i}")
+                with c2:
+                    s_dur = st.text_input(f"Clip {i+1} Duration", value="28", key=f"dur_{i}")
+                clip_ranges.append((s_start, s_dur))
+        else:
+            target_clip_len = st.selectbox("Target Duration (Sec)", [10, 20, 30, 40, 50, 60, 70, 80, 90, 100], index=2)
+            st.info("AI will automatically split video into smart clips.")
+
+        st.markdown("---")
+
+        # --- 4. VIDEO & AUDIO SETTINGS ---
+        with st.expander("🎥 Video Filters & 🎵 Audio Settings"):
+            filter_category = st.selectbox("Filter Category", [
+                "High Quality & Aesthetic Filters (For Face & Body)",
+                "🎬 Cinematic & Vibe Filters (For Travel & Vlogs)",
+                "🤖 Viral AI & Special Effects Filters"
+            ], index=0, key=f"fc_{st.session_state.reset_trigger}")
+
+            if filter_category == "High Quality & Aesthetic Filters (For Face & Body)":
+                specific_filter_options = ["None", "iPhone HD", "HD Glamour Filter", "Flash CCD", "Universal Sunset", "Bold Glamour", "Bubblegum"]
+            elif filter_category == "🎬 Cinematic & Vibe Filters (For Travel & Vlogs)":
+                specific_filter_options = ["None", "Cinematic Glow / HD", "Green Lake", "Renoir / Reno", "Moon Rise", "Bad Bunny", "Cool Vibes"]
+            else:
+                specific_filter_options = ["None", "Cartoon Filter AI", "Barbie Girl AI / Princess", "Kid Teen Now Aged", "Falling Filter", "2016 Filter", "Velocity x Color AD", "Thermal Effect", "Dreamy Halo"]
+
+            f_col1, f_col2 = st.columns(2)
+            with f_col1:
+                specific_filter = st.selectbox("Select Filter", specific_filter_options, index=0, key=f"sf_{st.session_state.reset_trigger}")
+            with f_col2:
+                style_effect = st.selectbox("Style and Effects", ["None", "AI Autofill", "Velocity (Auto Velocity)", "3D Zoom Pro", "Camera Shake", "VHS Glitch Overlay"], index=0, key=f"se_{st.session_state.reset_trigger}")
+
+            v_col1, v_col2 = st.columns(2)
+            with v_col1:
+                enable_flip = st.checkbox("🔄 Horizontal Flip", value=False, key=f"flp_{st.session_state.reset_trigger}")
+            with v_col2:
+                video_speed = st.selectbox("Video Speed", ["1.0x (Normal)", "1.1x (Fast Viral)", "1.25x (Super Fast)"], index=0, key=f"spd_{st.session_state.reset_trigger}")
+                speed_val = 1.0 if "1.0x" in video_speed else (1.1 if "1.1x" in video_speed else 1.25)
+
+            if st.button("🔄 Reset Video Filters & Effects"):
+                st.session_state.reset_trigger += 1
+                st.rerun()
+
+            enable_bg_music = st.checkbox("Add Background Music Track?", value=False)
+            bg_music_file = None
+            if enable_bg_music:
+                uploaded_music = st.file_uploader("Upload Background MP3 Audio File", type=["mp3", "wav"])
+                if uploaded_music is not None:
+                    with open(bg_music_path, "wb") as f:
+                        f.write(uploaded_music.getbuffer())
+                    st.success("Background Music Loaded!")
+                    bg_music_file = bg_music_path
+
+                ac1, ac2 = st.columns(2)
+                with ac1:
+                    orig_vol_pct = st.slider("Original Voice Volume (%)", min_value=0, max_value=200, value=100, step=5)
+                    orig_vol = orig_vol_pct / 100.0
+                with ac2:
+                    bg_vol_pct = st.slider("Background Music Volume (%)", min_value=0, max_value=100, value=15, step=1)
+                    bg_vol = bg_vol_pct / 100.0
+
+        render_clicked = st.button("🚀 Render Shorts Batch Now", type="primary", use_container_width=True)
+
+    with col_left:
+        if not os.path.exists(video_path):
+            st.markdown("### 📥 Media Input")
+            option = st.radio("Input Method:", ("Upload MP4 File", "Paste URL (YouTube / FB / Insta)"))
+
+            if option == "Paste URL (YouTube / FB / Insta)":
+                video_url = st.text_input("Video URL Paste Karein:")
+                if video_url and st.button("Fetch & Download Video"):
+                    with st.spinner("Downloading Video (Please wait)..."):
+                        if os.path.exists(video_path):
+                            os.remove(video_path)
+                    
+                        dl_cmd = (
+                            f'yt-dlp --no-check-certificates --geo-bypass --remote-components ejs:npm '
+                            f'--extractor-args "youtube:player_client=web,mweb" '
+                            f'-f "bestvideo[ext=mp4]+bestaudio[ext=mp4]/best[ext=mp4]/best" '
+                            f'-o "{video_path}" "{video_url}"'
+                        )
+                        result = subprocess.run(dl_cmd, shell=True, capture_output=True, text=True)
+                    
+                        if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
+                            st.success("Video Successfully Downloaded & Saved!")
+                            st.rerun()
+                        else:
+                            fallback_cmd = f'yt-dlp --no-check-certificates --remote-components ejs:npm --extractor-args "youtube:player_client=ios" -o "{video_path}" "{video_url}"'
+                            subprocess.run(fallback_cmd, shell=True)
+                            if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
+                                st.success("Video Downloaded via Fallback & Saved!")
+                                st.rerun()
+                            else:
+                                st.error("Download failed! Detailed Error:")
+                                if result.stderr:
+                                    st.code(result.stderr[:400])
+                                else:
+                                    st.error("Unknown error occurred during download.")
+
+            elif option == "Upload MP4 File":
+                uploaded_file = st.file_uploader("Upload MP4 File", type=["mp4"])
+                if uploaded_file is not None:
+                    with open(video_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    st.session_state.generated_clips = []
+                    st.success("File Uploaded & Saved!")
+                    st.rerun()
+        else:
+            target_time = "0"
+            vf_preview_parts = []
+        
+            # Determine X coordinate
+            if st.session_state.enable_face_tracking:
+                f_x = detect_face_center(video_path, target_time)
+                if f_x:
+                    f_x_expr = str(f_x)
+                else:
+                    f_x_expr = f"in_w * {st.session_state.manual_offset_x / 100.0}"
+            else:
+                f_x_expr = f"in_w * {st.session_state.manual_offset_x / 100.0}"
+
+            f_y_expr = f"in_h * {st.session_state.manual_offset_y / 100.0}"
+
+            if "9:16" in output_format:
+                crop_w = f"ih*{scale_w}/{scale_h}"
+                crop_h = "ih*0.95"
+                crop_x = f"clip({f_x_expr}-{crop_w}/2\\, 0\\, in_w-{crop_w})"
+                crop_y = f"clip({f_y_expr}-{crop_h}/2\\, 0\\, in_h-{crop_h})"
+                vf_preview_parts = [f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}"]
+            else:
+                vf_preview_parts = [crop_filter]
+
+            if enable_flip:
+                vf_preview_parts.append("hflip")
+        
+            f_str = get_filter_ffmpeg_string(filter_category, specific_filter)
+            if f_str:
+                vf_preview_parts.append(f_str)
+
+            e_str = get_style_effect_ffmpeg_string(style_effect)
+            if e_str:
+                vf_preview_parts.append(e_str)
+
+            vf_preview_parts.append(f"scale={preview_scale_w}:{preview_scale_h}")
+            vf_preview_str = ",".join(vf_preview_parts)
+
+            dynamic_preview_path = os.path.join(DOWNLOAD_DIR, f"preview_frame_{st.session_state.manual_offset_x}_{st.session_state.manual_offset_y}.jpg")
+
+            subprocess.run(
+                f'ffmpeg -y -ss {target_time} -i "{video_path}" -vframes 1 -vf "{vf_preview_str}" "{dynamic_preview_path}"', 
+                shell=True, capture_output=True
+            )
+        
+            # --- SIDE-BY-SIDE LAYOUT: PREVIEW ON LEFT, CONTROLS ON RIGHT ---
+            prev_col, ctrl_col = st.columns([1.2, 1.1])
+        
+            with prev_col:
+                if os.path.exists(dynamic_preview_path):
+                    img = Image.open(dynamic_preview_path)
+                    draw = ImageDraw.Draw(img)
+                
+                    if enable_subs:
+                        text_color, outline_color, _, _, _ = get_subtitle_styling(style_preset)
+                        w, h = img.size
+                        sample_words = ["CLIPPING", "PREVIEW", "VIRAL", "STUDIO"]
+                        raw_text = " ".join(sample_words[:words_per_line])
+                    
+                        wrap_width = max(8, int(16 - (font_size / 3)))
+                        wrapped_lines = textwrap.wrap(raw_text, width=wrap_width)
+                        wrapped_text = "\n".join(wrapped_lines)
+
+                        preview_calc_size = int(font_size * (preview_scale_h / scale_h) * 2.2)
+                        font = get_pro_font(font_choice, preview_calc_size)
+
+                        if "Top" in caption_align:
+                            y_pos = int(h * 0.18)
+                        elif "Middle-Center" in caption_align:
+                            y_pos = int(h * 0.5)
+                        else:
+                            y_pos = int(h - int(h * 0.22))
+
+                        x_pos = int(w / 2)
+                        draw.multiline_text(
+                            (x_pos, y_pos), wrapped_text, font=font, fill=text_color, 
+                            anchor="mm", align="center", stroke_width=max(1, int(preview_calc_size * 0.08)), stroke_fill=outline_color
+                        )
+                    
+                    st.image(img, width=preview_scale_w, caption=f"Live Preview | {output_format}")
+
+            with ctrl_col:
+                st.checkbox("Smart AI Face Tracking", key="enable_face_tracking")
+                st.slider("Horizontal (Left/Right)", min_value=0, max_value=100, key="manual_offset_x")
+                st.slider("Vertical (Up/Down)", min_value=0, max_value=100, key="manual_offset_y")
+            
+            if st.button("❌ Remove / Change Video", use_container_width=True):
+                os.remove(video_path)
+                if os.path.exists(dynamic_preview_path):
+                    os.remove(dynamic_preview_path)
+                st.session_state.generated_clips = []
+                st.rerun()
+
+            # --- BATCH DOWNLOAD BUTTON (WITHOUT HEADER) ---
+            st.markdown("---")
+        
+            has_clips = len(st.session_state.generated_clips) > 0
+            zip_path = os.path.join(DOWNLOAD_DIR, "all_shorts_clips.zip")
+        
+            zip_data = b""
+            if has_clips:
+                with zipfile.ZipFile(zip_path, 'w') as zipf:
+                    for c_num, f_path in st.session_state.generated_clips:
+                        if os.path.exists(f_path):
+                            zipf.write(f_path, arcname=os.path.basename(f_path))
+                if os.path.exists(zip_path):
+                    with open(zip_path, "rb") as fp:
+                        zip_data = fp.read()
+
+            st.download_button(
+                label="📥 Download All Shorts (ZIP)",
+                data=zip_data if has_clips else b"",
+                file_name="AI_Clipping_Studio_Batch.zip",
+                mime="application/zip",
+                type="primary",
+                use_container_width=True,
+                disabled=not has_clips
+            )
+        
+            if has_clips:
+                st.success("ZIP file Ready to Download")
+            else:
+                st.info("Render 1 or more clips")
+
+    # --- RENDERING & EXPORT GALLERY ---
+    if os.path.exists(video_path) and render_clicked:
+        tasks = []
+        if clip_mode == "Manual" and 'clip_ranges' in locals():
+            for idx, (s_st, s_du) in enumerate(clip_ranges):
+                try:
+                    t_start, t_dur = int(s_st), int(s_du)
+                except:
+                    t_start, t_dur = idx * 30, 28
+                tasks.append((idx + 1, t_start, t_dur))
+        else:
+            # Auto-Split AI logic based on selected target duration dropdown
+            # Creating multiple tasks across the video duration if needed, or default segments based on target_clip_len
+            tasks = [(1, 0, target_clip_len), (2, target_clip_len + 5, target_clip_len), (3, (target_clip_len * 2) + 10, target_clip_len)]
+
+        model = whisper.load_model("base") if enable_subs else None
+        st.session_state.generated_clips = []
+
+        with st.spinner("Processing High-Quality Professional Shorts (Fast Speed)..."):
+            total_tasks = len(tasks)
+            for i, (clip_num, start_sec, duration_sec) in enumerate(tasks):
+                cropped_file = os.path.join(DOWNLOAD_DIR, f"cropped_{clip_num}.mp4")
+                final_file = os.path.join(DOWNLOAD_DIR, f"final_short_{clip_num}.mp4")
+            
+                render_vf_parts = []
+                if st.session_state.enable_face_tracking:
+                    f_x = detect_face_center(video_path, start_sec)
+                    if f_x:
+                        f_x_expr = str(f_x)
+                    else:
+                        f_x_expr = f"in_w * {st.session_state.manual_offset_x / 100.0}"
+                else:
+                    f_x_expr = f"in_w * {st.session_state.manual_offset_x / 100.0}"
+
+                f_y_expr = f"in_h * {st.session_state.manual_offset_y / 100.0}"
+
+                if "9:16" in output_format:
+                    crop_w = f"ih*{scale_w}/{scale_h}"
+                    crop_h = "ih*0.95"
+                    crop_x = f"clip({f_x_expr}-{crop_w}/2\\, 0\\, in_w-{crop_w})"
+                    crop_y = f"clip({f_y_expr}-{crop_h}/2\\, 0\\, in_h-{crop_h})"
+                    render_vf_parts = [f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}"]
+                else:
+                    render_vf_parts = [crop_filter]
+
+                if enable_flip:
+                    render_vf_parts.append("hflip")
+            
+                f_str = get_filter_ffmpeg_string(filter_category, specific_filter)
+                if f_str:
+                    render_vf_parts.append(f_str)
+
+                e_str = get_style_effect_ffmpeg_string(style_effect)
+                if e_str:
+                    render_vf_parts.append(e_str)
+
+                render_vf_parts.append(f"scale={scale_w}:{scale_h}")
+            
+                if speed_val != 1.0:
+                    render_vf_parts.append(f"setpts=PTS/{speed_val}")
+
+                render_vf_str = ",".join(render_vf_parts)
+                audio_filter_str = f"atempo={speed_val}" if speed_val != 1.0 else "anull"
+
+                crop_cmd = (
+                    f'ffmpeg -y -ss {start_sec} -i "{video_path}" -t {duration_sec} '
+                    f'-vf "{render_vf_str}" -af "{audio_filter_str}" '
+                    f'-c:v libx264 -preset ultrafast -crf 20 -c:a aac "{cropped_file}"'
+                )
+                subprocess.run(crop_cmd, shell=True)
+
+                mixed_audio_file = os.path.join(DOWNLOAD_DIR, f"mixed_{clip_num}.mp4")
+                if enable_bg_music and os.path.exists(bg_music_path):
+                    mix_cmd = (
+                        f'ffmpeg -y -i "{cropped_file}" -stream_loop -1 -i "{bg_music_path}" '
+                        f'-filter_complex "[0:a]volume={orig_vol}[a1];[1:a]volume={bg_vol}[a2];[a1][a2]amix=inputs=2:duration=first[aout]" '
+                        f'-map 0:v -map "[aout]" -c:v copy -c:a aac "{mixed_audio_file}"'
+                    )
+                    subprocess.run(mix_cmd, shell=True)
+                    if os.path.exists(mixed_audio_file):
+                        cropped_file = mixed_audio_file
+
+                if enable_subs and model:
+                    whisper_audio_path = os.path.join(DOWNLOAD_DIR, f"whisper_audio_{clip_num}.wav")
+                    subprocess.run(f'ffmpeg -y -i "{cropped_file}" -vn -acodec pcm_s16le -ar 16000 -ac 1 "{whisper_audio_path}"', shell=True, capture_output=True)
+                
+                    align_map = {"Top (Safe Zone)": "6", "Middle-Center": "5", "Bottom (Safe Zone)": "2"}
+                    align_val = align_map[caption_align]
+                
+                    text_col, _, _, _, ass_color = get_subtitle_styling(style_preset)
+                    ass_font_name = get_font_family(font_choice)
+
+                    result = model.transcribe(whisper_audio_path if os.path.exists(whisper_audio_path) else cropped_file, word_timestamps=True)
+                    ass_file = os.path.join(DOWNLOAD_DIR, f"subs_{clip_num}.ass")
+                
+                    with open(ass_file, "w", encoding="utf-8") as f:
+                        f.write(f"[Script Info]\nScriptType: v4.00+\nPlayResX: {scale_w}\nPlayResY: {scale_h}\n\n")
+                        f.write("[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
+                    
+                        margin_v_val = int(scale_h * 0.12) if "Bottom" in caption_align else (int(scale_h * 0.1) if "Top" in caption_align else int(scale_h * 0.5))
+                        render_ass_fontsize = int(font_size * (scale_h / 480) * 1.5)
+                    
+                        f.write(f"Style: Default,{ass_font_name},{render_ass_fontsize},{ass_color},&H00000000,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,{align_val},160,160,{margin_v_val},1\n\n")
+                        f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
+                    
+                        for segment in result['segments']:
+                            if 'words' in segment:
+                                words = segment['words']
+                                for j in range(0, len(words), words_per_line):
+                                    chunk = words[j:j + words_per_line]
+                                    start_t = chunk[0]['start']
+                                    end_t = chunk[-1]['end']
+                                    raw_str = " ".join([w['word'].strip() for w in chunk]).upper()
+                                
+                                    render_wrap_width = max(10, int(18 - (font_size / 4)))
+                                    wrapped_chunk = textwrap.wrap(raw_str, width=render_wrap_width)
+                                    text_str = "\\N".join(wrapped_chunk)
+                                
+                                    s_tot_m, s_s = divmod(start_t, 60)
+                                    s_h, s_m = divmod(s_tot_m, 60)
+                                
+                                    e_tot_m, e_s = divmod(end_t, 60)
+                                    e_h, e_m = divmod(e_tot_m, 60)
+                                
+                                    s_str = f"{int(s_h)}:{int(s_m):02d}:{int(s_s):02d}.{int((start_t%1)*100):02d}"
+                                    e_str = f"{int(e_h)}:{int(e_m):02d}:{int(e_s):02d}.{int((end_t%1)*100):02d}"
+                                
+                                    f.write(f"Dialogue: 0,{s_str},{e_str},Default,,0,0,0,,{text_str}\n")
+
+                    base_dir = os.path.dirname(os.path.abspath(__file__))
+                    fonts_dir = os.path.join(base_dir, "fonts")
+                
+                    sub_cmd = (
+                        f'ffmpeg -y -i "{cropped_file}" '
+                        f'-vf "ass={ass_file}:fontsdir={fonts_dir}" '
+                        f'-c:v libx264 -preset ultrafast -c:a aac "{final_file}"'
+                    )
+                    subprocess.run(sub_cmd, shell=True)
+                else:
+                    if os.path.exists(final_file):
+                        os.remove(final_file)
+                    os.rename(cropped_file, final_file)
+
+                st.session_state.generated_clips.append((clip_num, final_file))
+
+        st.rerun()
+
+    if st.session_state.generated_clips:
+        st.subheader("Export Gallery")
+        cols = st.columns(3)
+        for idx, (c_num, filepath) in enumerate(st.session_state.generated_clips):
+            col_target = cols[idx % 3]
+            with col_target:
+                st.markdown(f"**🎬 Short Clip {c_num}**")
+                st.video(filepath)
