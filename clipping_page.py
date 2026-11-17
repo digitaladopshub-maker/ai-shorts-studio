@@ -418,8 +418,6 @@ def render_clipping_page():
                     t_start, t_dur = idx * 30, 28
                 tasks.append((idx + 1, t_start, t_dur))
         else:
-            # Auto-Split AI logic based on selected target duration dropdown
-            # Creating multiple tasks across the video duration if needed, or default segments based on target_clip_len
             tasks = [(1, 0, target_clip_len), (2, target_clip_len + 5, target_clip_len), (3, (target_clip_len * 2) + 10, target_clip_len)]
 
         model = whisper.load_model("base") if enable_subs else None

@@ -1,4 +1,7 @@
 def get_filter_ffmpeg_string(filter_category, filter_name):
+    """
+    Returns FFmpeg video filter strings for aesthetic, cinematic, and viral effects.
+    """
     if not filter_name or filter_name == "None":
         return ""
         
@@ -41,6 +44,9 @@ def get_filter_ffmpeg_string(filter_category, filter_name):
     return ""
 
 def get_style_effect_ffmpeg_string(effect_name):
+    """
+    Returns FFmpeg strings for style adjustments, overlays, and motion effects.
+    """
     if not effect_name or effect_name == "None":
         return ""
     elif "Cyberpunk" in effect_name:

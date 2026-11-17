@@ -1,11 +1,14 @@
 def get_subtitle_styling(style_preset):
-    # Returns (text_color, outline_color, has_box, anim_type, ass_color_hex)
+    """
+    Returns subtitle styling configuration based on the selected style preset.
+    Returns: (text_color, outline_color, has_box, anim_type, ass_color_hex)
+    """
     preset_lower = style_preset.lower()
     
     if "hormozi" in preset_lower:
         return ("#FFFF00", "#000000", False, "Pop-In Scale", "&H0000FFFF")
     elif "border pop-up" in preset_lower:
-        return ("#FFFFFF", "#FF0000", True, "Pop-In Scale", "&H00FFFFFF")
+        return ("#FFFFFF", "#FF0000", True, "Pop-In Scale", "&H0000FFFF")
     elif "karaoke highlight" in preset_lower:
         return ("#FFD700", "#000080", False, "Pop-In Scale", "&H0000D7FF")
     elif "power word scale" in preset_lower:
