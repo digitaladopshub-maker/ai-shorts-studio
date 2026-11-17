@@ -11,6 +11,7 @@ from fonts import get_pro_font, get_font_family
 from effects_engine import get_filter_ffmpeg_string, get_style_effect_ffmpeg_string
 from subtitle_engine import get_subtitle_styling
 from face_tracker import sample_face_track, build_crop_expressions
+from multi_face_tracker import sample_active_face_track
 from ai_engine.viral_detector import rank_transcript_segments
 
 
@@ -67,7 +68,7 @@ def render_clipping_page():
     st.markdown('<p class="sub-text">Transform your long video into multiple highlight reels—in just one click!</p>', unsafe_allow_html=True)
 
     # --- MAIN LAYOUT SPLIT ---
-    col_left, col_right = st.columns([1.0, 1.3], gap="large")
+    col_left, col_right = st.columns([1.4, 1.0], gap="large")
 
     with col_right:
         # --- 1. OUTPUT FORMAT SECTION ---
@@ -271,7 +272,11 @@ def render_clipping_page():
             src_h = int(cap_meta.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
             cap_meta.release()
             if "9:16" in output_format and src_w > 0 and src_h > 0:
-                preview_track = sample_face_track(video_path, 0, 1.5, sample_interval=0.75)
+                preview_track, preview_speaker_info = sample_active_face_track(
+                    video_path, 0, 2.4, sample_interval=0.6, max_width=480
+                )
+                if not preview_track:
+                    preview_track = sample_face_track(video_path, 0, 2.4, sample_interval=0.6)
                 if preview_track:
                     face_cx, face_cy = preview_track[0][1], preview_track[0][2]
                     crop_w = "min(iw\\,ih*9/16)"
@@ -305,46 +310,45 @@ def render_clipping_page():
                 shell=True, capture_output=True
             )
 
-            # --- SIDE-BY-SIDE LAYOUT: PREVIEW ON LEFT, CONTROLS ON RIGHT ---
-            prev_col, ctrl_col = st.columns([1.2, 1.1])
+            # Preview first; all tracking controls/status live BELOW it so they
+            # never overlap or cover the uploaded video in narrow Streamlit columns.
+            if os.path.exists(dynamic_preview_path):
+                img = Image.open(dynamic_preview_path)
+                draw = ImageDraw.Draw(img)
 
-            with prev_col:
-                if os.path.exists(dynamic_preview_path):
-                    img = Image.open(dynamic_preview_path)
-                    draw = ImageDraw.Draw(img)
+                if enable_subs:
+                    text_color, outline_color, _, _, _ = get_subtitle_styling(style_preset)
+                    w, h = img.size
+                    sample_words = ["CLIPPING", "PREVIEW", "VIRAL", "STUDIO"]
+                    raw_text = " ".join(sample_words[:words_per_line])
+                    wrap_width = max(8, int(16 - (font_size / 3)))
+                    wrapped_lines = textwrap.wrap(raw_text, width=wrap_width)
+                    wrapped_text = "\n".join(wrapped_lines)
+                    preview_calc_size = int(font_size * (preview_scale_h / scale_h) * 2.2)
+                    font = get_pro_font(font_choice, preview_calc_size)
+                    if "Top" in caption_align:
+                        y_pos = int(h * 0.18)
+                    elif "Middle-Center" in caption_align:
+                        y_pos = int(h * 0.5)
+                    else:
+                        y_pos = int(h - int(h * 0.22))
+                    x_pos = int(w / 2)
+                    draw.multiline_text(
+                        (x_pos, y_pos), wrapped_text, font=font, fill=text_color,
+                        anchor="mm", align="center", stroke_width=max(1, int(preview_calc_size * 0.08)), stroke_fill=outline_color
+                    )
 
-                    if enable_subs:
-                        text_color, outline_color, _, _, _ = get_subtitle_styling(style_preset)
-                        w, h = img.size
-                        sample_words = ["CLIPPING", "PREVIEW", "VIRAL", "STUDIO"]
-                        raw_text = " ".join(sample_words[:words_per_line])
+                st.image(img, use_container_width=True, caption=f"Live Preview | {output_format}")
 
-                        wrap_width = max(8, int(16 - (font_size / 3)))
-                        wrapped_lines = textwrap.wrap(raw_text, width=wrap_width)
-                        wrapped_text = "\n".join(wrapped_lines)
-
-                        preview_calc_size = int(font_size * (preview_scale_h / scale_h) * 2.2)
-                        font = get_pro_font(font_choice, preview_calc_size)
-
-                        if "Top" in caption_align:
-                            y_pos = int(h * 0.18)
-                        elif "Middle-Center" in caption_align:
-                            y_pos = int(h * 0.5)
-                        else:
-                            y_pos = int(h - int(h * 0.22))
-
-                        x_pos = int(w / 2)
-                        draw.multiline_text(
-                            (x_pos, y_pos), wrapped_text, font=font, fill=text_color, 
-                            anchor="mm", align="center", stroke_width=max(1, int(preview_calc_size * 0.08)), stroke_fill=outline_color
-                        )
-
-                    st.image(img, width=preview_scale_w, caption=f"Live Preview | {output_format}")
-
-            with ctrl_col:
-                st.success("Smart Face Tracking: AUTOMATIC ON")
-                st.caption("Har clip ke andar sampled face positions smooth karke crop follow karega. Face na mile to safe centre framing use hogi.")
-                with st.expander("Advanced fallback framing"):
+            st.markdown("#### Smart Framing")
+            with st.container(border=True):
+                st.success("Automatic Face & Multi-Person Tracking: ON")
+                st.caption(
+                    "System multiple faces ko track karta hai aur visible mouth movement se possible active speaker ka andaza lagata hai. "
+                    "Agar speaker clear na ho to stable face/centre framing use hoti hai."
+                )
+                with st.expander("Advanced fallback framing", expanded=False):
+                    st.caption("Yeh settings sirf tab use hoti hain jab face detect na ho ya tracking uncertain ho.")
                     st.slider("Horizontal fallback", min_value=0, max_value=100, key="manual_offset_x")
                     st.slider("Vertical fallback", min_value=0, max_value=100, key="manual_offset_y")
 
@@ -463,8 +467,12 @@ def render_clipping_page():
                 cap_meta.release()
 
                 if "9:16" in output_format and src_w > 0 and src_h > 0:
-                    face_samples = sample_face_track(video_path, start_sec, duration_sec,
-                                                     sample_interval=0.65, max_width=480)
+                    face_samples, speaker_info = sample_active_face_track(
+                        video_path, start_sec, duration_sec, sample_interval=0.65, max_width=480
+                    )
+                    if not face_samples:
+                        face_samples = sample_face_track(video_path, start_sec, duration_sec,
+                                                         sample_interval=0.65, max_width=480)
                     crop_w = "min(iw\\,ih*9/16)"
                     crop_h = "min(ih\\,iw*16/9)"
                     fallback_cx = src_w * (st.session_state.manual_offset_x / 100.0)
