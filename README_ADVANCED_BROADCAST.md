@@ -35,21 +35,9 @@ No additional Python dependency is required; Pillow is already included in `requ
 
 The streaming dashboard now supports saved, editable RTMP destination profiles and selecting multiple saved destinations before starting a stream. FFmpeg's tee muxer sends one encoded output to the selected destinations.
 
-### Secure saved stream keys
+### Temporary streaming accounts
 
-Add a stable Fernet key to Streamlit Community Cloud: **App → Settings → Secrets**:
-
-```toml
-STREAM_KEY_ENCRYPTION_KEY = "PASTE_A_FERNET_KEY_HERE"
-```
-
-Generate a key locally with:
-
-```bash
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-```
-
-Do not commit this key or any RTMP stream key to GitHub. If the encryption key changes, previously saved profiles cannot be decrypted. Keep a secure backup of the encryption key.
+RTMP destination details are held only in the current Streamlit session memory. They are not encrypted to disk, are not written to a persistent profile file, and are not retained for the next visit. Add each account, press **Save Account**, add other destinations as needed, then press **Done** and select the destinations for the current live session. If the app session ends or the app restarts, enter the account details again. No `STREAM_KEY_ENCRYPTION_KEY` secret is required.
 
 ### Important architecture limitation
 

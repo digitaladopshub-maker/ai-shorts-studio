@@ -5,12 +5,10 @@ import time
 import threading
 import subprocess
 import uuid
-import base64
 from pathlib import Path
 
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
-from cryptography.fernet import Fernet, InvalidToken
 
 BASE_DIR = Path(__file__).resolve().parent
 STREAM_DIR = BASE_DIR / "streaming_uploads"
@@ -22,7 +20,6 @@ ASSET_DIR.mkdir(exist_ok=True)
 CANVAS_W, CANVAS_H = 1280, 720
 OVERLAY_FPS = 5
 LOG_PATH = STREAM_DIR / "ffmpeg_live.log"
-PROFILES_PATH = STREAM_DIR / "stream_profiles.enc"
 
 PLATFORMS = {
     "YouTube": "rtmp://a.rtmp.youtube.com/live2",
@@ -31,34 +28,15 @@ PLATFORMS = {
     "Custom RTMP": "",
 }
 
-def _encryption_key():
-    """Read a stable Fernet key from Streamlit secrets or environment."""
-    key = os.environ.get("STREAM_KEY_ENCRYPTION_KEY", "").strip()
-    if not key:
-        try:
-            key = str(st.secrets.get("STREAM_KEY_ENCRYPTION_KEY", "")).strip()
-        except Exception:
-            key = ""
-    return key or None
-
 def _load_profiles():
-    key = _encryption_key()
-    if not key or not PROFILES_PATH.exists():
-        return []
-    try:
-        raw = PROFILES_PATH.read_bytes()
-        return json.loads(Fernet(key.encode()).decrypt(raw).decode("utf-8"))
-    except (InvalidToken, ValueError, OSError, TypeError):
-        return []
+    """Accounts are intentionally temporary: kept only in this Streamlit session."""
+    return st.session_state.setdefault("stream_profiles_session", [])
+
 
 def _save_profiles(profiles):
-    key = _encryption_key()
-    if not key:
-        raise RuntimeError("Streamlit Secrets mein STREAM_KEY_ENCRYPTION_KEY set karein. Is ke baghair keys save nahi hongi.")
-    encrypted = Fernet(key.encode()).encrypt(json.dumps(profiles).encode("utf-8"))
-    tmp = PROFILES_PATH.with_suffix(".tmp")
-    tmp.write_bytes(encrypted)
-    os.replace(tmp, PROFILES_PATH)
+    """Update in-memory accounts only; nothing is written to disk or saved for next visit."""
+    st.session_state["stream_profiles_session"] = profiles
+
 
 def _tee_escape(value):
     # FFmpeg tee URL option escaping. RTMP keys normally contain URL-safe characters.
@@ -386,57 +364,40 @@ def _render_graphics_studio():
 
 def _render_account_manager():
     st.subheader("Streaming Accounts")
-    st.caption("Apne channels aur pages save karein. Har account ko baad mein edit bhi kar sakte hain.")
+    st.caption("Is live session ke liye accounts bari bari add karein. Agli visit par dobara enter karne honge.")
 
     profiles = _load_profiles()
-    # Draft cards are held in the Streamlit session until each account is saved.
     drafts_key = "stream_account_drafts"
     if drafts_key not in st.session_state:
         st.session_state[drafts_key] = []
 
-    if not _encryption_key():
-        st.info("Accounts save karne ke liye app administrator ko secure encryption key configure karni hogi.")
-
     def account_editor(profile, is_new=False, index=0):
-        pid = profile.get("id") or f"new_{index}"
+        pid = profile.get("id") or profile.get("_draft_id") or f"new_{index}"
         title = "New account" if is_new else profile.get("name", f"Account {index + 1}")
         with st.container(border=True):
-            top_left, top_right = st.columns([5, 1])
-            top_left.markdown(f"**{title}**")
-            if not is_new:
-                top_right.caption(profile.get("platform", ""))
-            with st.form(f"stream_account_form_{pid}"):
-                name = st.text_input(
-                    "Account / Channel Name",
-                    value=profile.get("name", ""),
-                    placeholder="e.g. My YouTube Channel",
-                    key=f"account_name_{pid}",
-                )
-                platform_options = list(PLATFORMS)
-                old_platform = profile.get("platform", "YouTube")
-                platform_index = platform_options.index(old_platform) if old_platform in platform_options else 0
-                platform = st.selectbox(
-                    "Platform",
-                    platform_options,
-                    index=platform_index,
-                    key=f"account_platform_{pid}",
-                )
-                server_default = profile.get("server") or PLATFORMS.get(platform, "")
-                server = st.text_input(
-                    "RTMP Server URL",
-                    value=server_default,
-                    placeholder="rtmp://...",
-                    key=f"account_server_{pid}",
-                )
-                stream_key = st.text_input(
-                    "Stream Key",
-                    value=profile.get("key", ""),
-                    type="password",
-                    placeholder="Enter stream key",
-                    key=f"account_key_{pid}",
-                )
-                submitted = st.form_submit_button("Save Account", type="primary", use_container_width=True)
-            if submitted:
+            st.markdown(f"**{title}**")
+            name = st.text_input("Account / Channel Name", value=profile.get("name", ""),
+                                 placeholder="e.g. My YouTube Channel", key=f"account_name_{pid}")
+            platform_options = list(PLATFORMS)
+            old_platform = profile.get("platform", "YouTube")
+            platform_index = platform_options.index(old_platform) if old_platform in platform_options else 0
+            platform = st.selectbox("Platform", platform_options, index=platform_index,
+                                    key=f"account_platform_{pid}")
+            server_key = f"account_server_{pid}"
+            # Set platform-specific default when the selected platform changes.
+            previous_key = f"account_prev_platform_{pid}"
+            previous_platform = st.session_state.get(previous_key, old_platform)
+            if platform != previous_platform:
+                st.session_state[server_key] = PLATFORMS.get(platform, "")
+                st.session_state[previous_key] = platform
+            else:
+                st.session_state.setdefault(previous_key, platform)
+            server = st.text_input("RTMP Server URL", value=profile.get("server") or PLATFORMS.get(platform, ""),
+                                   placeholder="rtmp://...", key=server_key)
+            stream_key = st.text_input("Stream Key", value=profile.get("key", ""), type="password",
+                                       placeholder="Enter stream key", key=f"account_key_{pid}")
+            c1, c2 = st.columns(2)
+            if c1.button("Save Account", key=f"save_account_{pid}", type="primary", use_container_width=True):
                 if not name.strip():
                     st.error("Account / Channel Name enter karein.")
                 elif not server.strip().startswith(("rtmp://", "rtmps://")):
@@ -444,65 +405,54 @@ def _render_account_manager():
                 elif not stream_key.strip():
                     st.error("Stream Key enter karein.")
                 else:
-                    updated_profile = {
-                        "id": profile.get("id") or uuid.uuid4().hex[:10],
-                        "name": name.strip(),
-                        "platform": platform,
-                        "server": server.strip(),
-                        "key": stream_key.strip(),
-                    }
+                    updated_profile = {"id": profile.get("id") or uuid.uuid4().hex[:10],
+                                       "name": name.strip(), "platform": platform,
+                                       "server": server.strip(), "key": stream_key.strip()}
                     updated = [p for p in profiles if p.get("id") != updated_profile["id"]]
                     updated.append(updated_profile)
-                    try:
-                        _save_profiles(updated)
-                        st.session_state[drafts_key] = [
-                            d for d in st.session_state[drafts_key]
-                            if d.get("_draft_id") != profile.get("_draft_id")
-                        ]
-                        st.success(f"{name.strip()} saved successfully.")
-                        st.rerun()
-                    except Exception as exc:
-                        st.error(f"Account save nahi ho saka: {exc}")
+                    _save_profiles(updated)
+                    st.session_state[drafts_key] = [d for d in st.session_state[drafts_key]
+                                                     if d.get("_draft_id") != profile.get("_draft_id")]
+                    st.success(f"{name.strip()} is live session ke liye add ho gaya.")
+                    st.rerun()
+            if c2.button("Delete", key=f"delete_account_{pid}", use_container_width=True):
+                if not is_new and profile.get("id"):
+                    _save_profiles([p for p in profiles if p.get("id") != profile.get("id")])
+                st.session_state[drafts_key] = [d for d in st.session_state[drafts_key]
+                                                if d.get("_draft_id") != profile.get("_draft_id")]
+                st.rerun()
 
-            if not is_new:
-                if st.button("Delete Account", key=f"delete_account_{pid}", type="secondary"):
-                    try:
-                        _save_profiles([p for p in profiles if p.get("id") != profile.get("id")])
-                        st.rerun()
-                    except Exception as exc:
-                        st.error(f"Account delete nahi ho saka: {exc}")
-
-    # Show the first account editor immediately, without hiding it in an expander.
     if profiles:
+        st.markdown("**Added accounts**")
         for index, profile in enumerate(profiles):
             account_editor(profile, is_new=False, index=index)
     else:
-        account_editor(
-            {"id": None, "name": "", "platform": "YouTube",
-             "server": PLATFORMS.get("YouTube", ""), "key": ""},
-            is_new=True,
-            index=0,
-        )
+        account_editor({"id": None, "name": "", "platform": "YouTube",
+                        "server": PLATFORMS["YouTube"], "key": ""}, is_new=True, index=0)
 
-    # New account forms appear below the existing account(s).
     for index, draft in enumerate(st.session_state[drafts_key]):
-        account_editor(draft, is_new=True, index=index + 1)
+        account_editor(draft, is_new=True, index=index + len(profiles) + 1)
 
-    if st.button("＋ Add Other Account", key="add_other_stream_account", use_container_width=True):
-        st.session_state[drafts_key].append({
-            "_draft_id": uuid.uuid4().hex[:10],
-            "id": None,
-            "name": "",
-            "platform": "YouTube",
-            "server": PLATFORMS.get("YouTube", ""),
-            "key": "",
-        })
+    c1, c2 = st.columns(2)
+    if c1.button("＋ Add Other Account", key="add_other_stream_account", use_container_width=True):
+        st.session_state[drafts_key].append({"_draft_id": uuid.uuid4().hex[:10], "id": None,
+                                             "name": "", "platform": "YouTube",
+                                             "server": PLATFORMS["YouTube"], "key": ""})
         st.rerun()
+    if c2.button("Done", key="done_stream_accounts", type="primary", use_container_width=True):
+        if not profiles:
+            st.warning("Pehle kam az kam ek account add karein.")
+        elif st.session_state[drafts_key]:
+            st.warning("Pehle open account forms save ya delete karein.")
+        else:
+            st.session_state["stream_accounts_done"] = True
+            st.success("Accounts ready. Ab live ke liye platforms select karein.")
+
 
 def render_streaming_page():
     st.title("📡 Live Streaming Dashboard")
     st.caption("Ek dafa encode karke selected RTMP destinations par distribute karein.")
-    st.warning("Multi-platform start ke liye FFmpeg tee muxer use hota hai. Live ke beech destination add/remove karne ke liye separate persistent relay service (MediaMTX) deploy karna hoga; Community Cloud app akeli is feature ko reliable taur par host nahi kar sakti.")
+    st.caption("Is session mein YouTube, Facebook, TikTok ya Custom RTMP destinations add karke ek hi video ko stream karein.")
     _render_account_manager()
     st.markdown("---")
     proc = st.session_state.get("stream_process")
@@ -604,4 +554,4 @@ def render_streaming_page():
             except OSError as exc:
                 st.caption(f"Log read nahi ho saka: {exc}")
     st.markdown("---")
-    st.markdown("**Note:** Selected destinations ek hi encoded output share karte hain. Kisi destination ka RTMP key/account eligibility aur platform-side live permissions alag se valid honi chahiye. Live ke dauran destination add/remove ka next stage persistent relay service par hoga.")
+    st.caption("Account details sirf current app session mein rehti hain; app session khatam hone par dobara enter karni hongi. Platform ki apni live-streaming eligibility aur valid RTMP details zaroori hain.")
