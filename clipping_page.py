@@ -215,6 +215,19 @@ def render_clipping_page():
                     bg_vol_pct = st.slider("Background Music Volume (%)", min_value=0, max_value=100, value=15, step=1)
                     bg_vol = bg_vol_pct / 100.0
 
+        # Keep all framing controls in the settings column, never beside or over
+        # the portrait preview. Tracking runs automatically during preview/render.
+        with st.expander("🎯 Smart Framing Settings", expanded=False):
+            st.success("Smart Face Tracking: AUTOMATIC ON")
+            st.caption(
+                "Face aur possible active speaker tracking background mein automatically kaam karti hai. "
+                "Face detect na ho ya tracking uncertain ho to safe centre framing use hoti hai."
+            )
+            st.markdown("**Advanced fallback framing**")
+            st.caption("Yeh controls sirf fallback crop position adjust karte hain; automatic tracking ko band nahi karte.")
+            st.slider("Horizontal fallback", min_value=0, max_value=100, key="manual_offset_x")
+            st.slider("Vertical fallback", min_value=0, max_value=100, key="manual_offset_y")
+
         render_clicked = st.button("🚀 Render Shorts Batch Now", type="primary", use_container_width=True)
 
     with col_left:
@@ -310,8 +323,9 @@ def render_clipping_page():
                 shell=True, capture_output=True
             )
 
-            # Preview first; all tracking controls/status live BELOW it so they
-            # never overlap or cover the uploaded video in narrow Streamlit columns.
+            # Preview is intentionally limited to the video image and caption.
+            # Tracking status and fallback controls are placed in the settings
+            # column above, keeping the portrait preview unobstructed.
             if os.path.exists(dynamic_preview_path):
                 img = Image.open(dynamic_preview_path)
                 draw = ImageDraw.Draw(img)
@@ -339,18 +353,6 @@ def render_clipping_page():
                     )
 
                 st.image(img, use_container_width=True, caption=f"Live Preview | {output_format}")
-
-            st.markdown("#### Smart Framing")
-            with st.container(border=True):
-                st.success("Automatic Face & Multi-Person Tracking: ON")
-                st.caption(
-                    "System multiple faces ko track karta hai aur visible mouth movement se possible active speaker ka andaza lagata hai. "
-                    "Agar speaker clear na ho to stable face/centre framing use hoti hai."
-                )
-                with st.expander("Advanced fallback framing", expanded=False):
-                    st.caption("Yeh settings sirf tab use hoti hain jab face detect na ho ya tracking uncertain ho.")
-                    st.slider("Horizontal fallback", min_value=0, max_value=100, key="manual_offset_x")
-                    st.slider("Vertical fallback", min_value=0, max_value=100, key="manual_offset_y")
 
             if st.button("❌ Remove / Change Video", use_container_width=True):
                 os.remove(video_path)
