@@ -1,0 +1,11 @@
+cookies.txt
+*.cookie
+.env
+.env.*
+__pycache__/
+*.py[cod]
+downloads/
+streaming_uploads/
+.streamlit/secrets.toml
+*.tmp
+*.log
