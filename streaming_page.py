@@ -50,7 +50,7 @@ def _alive(proc):
 
 
 def _resolve_video_url(source_url):
-    """Resolve a supported public page URL to one muxed media stream."""
+    """Resolve a supported page URL and return its matching media request headers."""
     source_url = (source_url or "").strip()
     if not source_url.lower().startswith(("http://", "https://")):
         raise ValueError("Enter a valid http:// or https:// video page URL.")
@@ -58,8 +58,6 @@ def _resolve_video_url(source_url):
     from yt_dlp import YoutubeDL
 
     options = {
-        # Prefer a single file carrying both audio and video. Keep HLS/DASH
-        # muxed formats eligible as a fallback for platforms that use them.
         "format": (
             "best[protocol^=http][vcodec!=none][acodec!=none]/"
             "best[protocol^=m3u8][vcodec!=none][acodec!=none]/"
@@ -76,25 +74,53 @@ def _resolve_video_url(source_url):
     if not info:
         raise ValueError("No video information was returned for this URL.")
 
+    # yt-dlp may expose the selected media URL at the top level while the
+    # browser-like request headers live on the selected format. Match them
+    # by URL rather than assuming info['http_headers'] is always sufficient.
     media_url = info.get("url")
-    headers = info.get("http_headers") or {}
+    headers = {}
+    selected_format = None
+    requested_formats = info.get("requested_formats") or []
+    all_formats = requested_formats + (info.get("formats") or [])
+    if media_url:
+        selected_format = next(
+            (fmt for fmt in all_formats if fmt.get("url") == media_url), None
+        )
+    headers.update(info.get("http_headers") or {})
+    if selected_format:
+        headers.update(selected_format.get("http_headers") or {})
+
     if not media_url:
-        formats = [x for x in (info.get("formats") or [])
-                   if x.get("url") and x.get("vcodec") != "none"
-                   and x.get("acodec") != "none"]
+        formats = [fmt for fmt in (info.get("formats") or [])
+                   if fmt.get("url") and fmt.get("vcodec") != "none"
+                   and fmt.get("acodec") != "none"]
         if formats:
-            # Prefer a muxed HTTP/HLS format; never pass separate video-only
-            # and audio-only URLs to the single-input FFmpeg pipeline.
-            formats.sort(key=lambda x: (
-                x.get("protocol", "").startswith(("http", "m3u8")),
-                x.get("height") or 0,
-                x.get("tbr") or 0,
+            formats.sort(key=lambda fmt: (
+                fmt.get("protocol", "").startswith(("http", "m3u8")),
+                fmt.get("height") or 0,
+                fmt.get("tbr") or 0,
             ))
-            selected = formats[-1]
-            media_url = selected["url"]
-            headers = selected.get("http_headers") or headers
+            selected_format = formats[-1]
+            media_url = selected_format["url"]
+            headers = dict(info.get("http_headers") or {})
+            headers.update(selected_format.get("http_headers") or {})
+
     if not media_url:
-        raise ValueError("Could not resolve a direct audio/video stream. The link may be private, login-protected, live-only, or unsupported.")
+        raise ValueError(
+            "Could not resolve a direct audio/video stream. The link may be private, "
+            "login-protected, live-only, or unsupported."
+        )
+
+    # Keep the same browser-like request context for the probe and FFmpeg.
+    # Preserve extractor-provided values; only fill missing common headers.
+    headers.setdefault("User-Agent", (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/131.0.0.0 Safari/537.36"
+    ))
+    headers.setdefault("Accept", "*/*")
+    headers.setdefault("Accept-Language", "en-US,en;q=0.9")
+    headers.setdefault("Referer", source_url)
     return media_url, headers
 
 
