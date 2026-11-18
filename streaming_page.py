@@ -51,7 +51,7 @@ def _resolve_video_url(source_url):
     """Resolve a supported public page URL to one muxed media stream."""
     source_url = (source_url or "").strip()
     if not source_url.lower().startswith(("http://", "https://")):
-        raise ValueError("Valid http:// ya https:// video page URL enter karein.")
+        raise ValueError("Enter a valid http:// or https:// video page URL.")
 
     from yt_dlp import YoutubeDL
 
@@ -72,7 +72,7 @@ def _resolve_video_url(source_url):
     if info and info.get("entries"):
         info = next((entry for entry in info["entries"] if entry), None)
     if not info:
-        raise ValueError("URL se video information nahi mili.")
+        raise ValueError("No video information was returned for this URL.")
 
     media_url = info.get("url")
     headers = info.get("http_headers") or {}
@@ -92,7 +92,7 @@ def _resolve_video_url(source_url):
             media_url = selected["url"]
             headers = selected.get("http_headers") or headers
     if not media_url:
-        raise ValueError("Is link se audio+video wala direct stream resolve nahi hua. Mumkin hai link private, login-protected, live-only, ya unsupported ho.")
+        raise ValueError("Could not resolve a direct audio/video stream. The link may be private, login-protected, live-only, or unsupported.")
     return media_url, headers
 
 
@@ -277,10 +277,10 @@ def _add_layer(layer):
 def _render_graphics_studio():
     st.markdown("---")
     st.header("🎨 Live Graphics & Overlay Studio")
-    st.caption("Yahan add ki gayi graphics running stream par overlay hoti hain. Changes live apply hoti hain; stream restart ki zaroorat nahi.")
+    st.caption("Graphics added here appear as overlays on the running stream. Changes apply live without restarting the stream.")
     layers = _load_layers()
 
-    with st.expander("🖼️ Photo / Logo add karein", expanded=False):
+    with st.expander("🖼️ Add Photo / Logo", expanded=False):
         photo = st.file_uploader("PNG / JPG / WEBP image", type=["png", "jpg", "jpeg", "webp"], key="overlay_photo")
         c1, c2, c3 = st.columns(3)
         px = c1.number_input("X position", 0, CANVAS_W-1, 40, key="photo_x")
@@ -289,7 +289,7 @@ def _render_graphics_studio():
         opacity = st.slider("Photo opacity", 10, 100, 100, key="photo_opacity")
         if st.button("＋ Add Photo / Logo", key="add_photo"):
             if photo is None:
-                st.warning("Pehle image upload karein.")
+                st.warning("Upload an image first.")
             else:
                 ext = Path(photo.name).suffix.lower()
                 if ext not in (".png", ".jpg", ".jpeg", ".webp"):
@@ -298,10 +298,10 @@ def _render_graphics_studio():
                     asset_path = ASSET_DIR / f"{uuid.uuid4().hex}{ext}"
                     asset_path.write_bytes(photo.getbuffer())
                     _add_layer({"type":"photo","name":photo.name,"path":str(asset_path),"x":int(px),"y":int(py),"width":int(pw),"height":600,"opacity":int(opacity)})
-                    st.success("Photo/logo live graphics mein add ho gaya.")
+                    st.success("Photo/logo added to live graphics.")
                     st.rerun()
 
-    with st.expander("✍️ Text add karein", expanded=False):
+    with st.expander("✍️ Add Text", expanded=False):
         txt = st.text_input("Text", max_chars=180, key="overlay_text")
         c1, c2, c3 = st.columns(3)
         tx = c1.number_input("X", 0, CANVAS_W-1, 60, key="text_x")
@@ -311,12 +311,12 @@ def _render_graphics_studio():
         if st.button("＋ Add Text", key="add_text"):
             if txt.strip():
                 _add_layer({"type":"text","name":txt[:32],"text":txt,"x":int(tx),"y":int(ty),"font_size":int(fs),"color":color})
-                st.success("Text live stream par add ho gaya.")
+                st.success("Text added to the live stream.")
                 st.rerun()
             else:
-                st.warning("Text enter karein.")
+                st.warning("Enter text.")
 
-    with st.expander("📢 Banner / Lower Third add karein", expanded=False):
+    with st.expander("📢 Add Banner / Lower Third", expanded=False):
         banner_text = st.text_input("Banner text", max_chars=180, key="banner_text")
         c1, c2, c3 = st.columns(3)
         bx = c1.number_input("Banner X", 0, CANVAS_W-1, 40, key="banner_x")
@@ -327,12 +327,12 @@ def _render_graphics_studio():
         if st.button("＋ Add Banner", key="add_banner"):
             if banner_text.strip():
                 _add_layer({"type":"banner","name":banner_text[:32],"text":banner_text,"x":int(bx),"y":int(by),"font_size":int(bfs),"color":bc,"background":bg,"background_opacity":230})
-                st.success("Banner live stream par add ho gaya.")
+                st.success("Banner added to the live stream.")
                 st.rerun()
             else:
-                st.warning("Banner text enter karein.")
+                st.warning("Enter banner text.")
 
-    with st.expander("📜 Scrolling ticker add karein", expanded=False):
+    with st.expander("📜 Add Scrolling Ticker", expanded=False):
         ticker_text = st.text_input("Ticker announcement", max_chars=250, key="ticker_text")
         c1, c2, c3 = st.columns(3)
         tfs = c1.slider("Ticker font size", 16, 54, 28, key="ticker_size")
@@ -342,14 +342,14 @@ def _render_graphics_studio():
         if st.button("＋ Add Scrolling Ticker", key="add_ticker"):
             if ticker_text.strip():
                 _add_layer({"type":"ticker","name":ticker_text[:32],"text":ticker_text,"font_size":int(tfs),"color":tc,"background":tb,"speed":int(speed)})
-                st.success("Scrolling ticker live ho gaya.")
+                st.success("Scrolling ticker added to the live stream.")
                 st.rerun()
             else:
-                st.warning("Ticker text enter karein.")
+                st.warning("Enter ticker text.")
 
     st.markdown("**Active graphics layers**")
     if not layers:
-        st.info("Abhi koi overlay nahi. Upar se photo, text, banner ya ticker add karein.")
+        st.info("No overlays yet. Add a photo, text, banner, or ticker above.")
     for layer in layers:
         with st.container(border=True):
             c1, c2, c3 = st.columns([5, 2, 2])
@@ -397,7 +397,7 @@ def _render_graphics_studio():
                             layer["text"] = new_text
                             layer["name"] = new_text[:32]
                         _save_layers(layers)
-                        st.success("Changes live apply ho gayi hain.")
+                        st.success("Changes applied to the live stream.")
                         st.rerun()
     if layers and st.button("Clear all graphics", key="clear_all_graphics"):
         for layer in layers:
@@ -408,10 +408,10 @@ def _render_graphics_studio():
                     pass
         _save_layers([])
         st.rerun()
-    st.caption("Overlay canvas: 1280×720, transparent background. Photo/logo ko add karte waqt position aur width set karein.")
+    st.caption("Overlay canvas: 1280×720 with a transparent background. Set the position and width when adding a photo/logo.")
     writer = st.session_state.get("overlay_thread")
     if writer is not None and not writer.is_alive():
-        st.error("Overlay sender thread band ho gaya hai. Neeche FFmpeg log check karein.")
+        st.error("Overlay sender thread stopped. Check the FFmpeg log below.")
     st.markdown("**Graphics preview**")
     st.image(_compose_overlay(_load_layers()), caption="Transparent overlay preview (actual video ke upar composite hota hai)", use_container_width=True)
 
@@ -453,19 +453,19 @@ def _render_account_manager():
             if platform in ("Facebook", "TikTok", "Custom RTMP"):
                 server = st.text_input(
                     "Server URL", value=server_value,
-                    placeholder="Facebook Live Producer se URL paste karein" if platform == "Facebook" else "rtmp:// ya rtmps:// server URL",
+                    placeholder="Paste the URL from Facebook Live Producer" if platform == "Facebook" else "rtmp:// or rtmps:// server URL",
                     key=f"dest_server_{sid}"
                 )
                 if platform == "Facebook":
-                    st.caption("Live Producer ka exact Server URL use karein. Preview aane par Facebook mein Go Live press karein.")
+                    st.caption("Use the exact Server URL from Live Producer. On Facebook, click Go Live after the preview appears.")
                 elif platform == "TikTok":
-                    st.caption("TikTok account ke LIVE Center se mila hua RTMP URL paste karein.")
+                    st.caption("Paste the RTMP URL provided by your TikTok LIVE Center.")
             else:
                 server = default_server
 
             stream_key = st.text_input(
                 "Stream Key", value=slot.get("key", ""), type="password",
-                placeholder="Yahan Stream Key paste karein", key=f"dest_key_{sid}"
+                placeholder="Paste your stream key here", key=f"dest_key_{sid}"
             )
             slot.update({"platform": platform, "key": stream_key, "active": active, "server": server})
 
@@ -476,7 +476,7 @@ def _render_account_manager():
                         "server": server.strip(), "key": stream_key.strip()
                     })
                 else:
-                    st.warning("Is platform ko ON karne ke liye valid Server URL aur Stream Key enter karein.")
+                    st.warning("Enter a valid Server URL and Stream Key to enable this platform.")
 
     # Show a fresh empty card after the last destination is activated and configured.
     if slots and slots[-1].get("active") and slots[-1].get("key", "").strip() and slots[-1].get("server", "").strip().startswith(("rtmp://", "rtmps://")):
@@ -503,9 +503,18 @@ def render_streaming_page():
     [data-testid="stWidgetLabel"] p, [data-testid="stWidgetLabel"] label,
     [data-testid="stMarkdownContainer"] p, .stCaption, label { color: #e2e8f0 !important; }
     [data-testid="stWidgetLabel"] p { font-weight: 600 !important; font-size: .92rem !important; }
-    div[data-testid="stTextInput"] input, div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
-    div[data-testid="stNumberInput"] input { background: #111c2c !important; color: #f8fafc !important; border-color: #40516b !important; border-radius: 10px !important; }
-    input::placeholder { color: #91a0b5 !important; opacity: 1 !important; }
+    div[data-testid="stTextInput"] input, div[data-testid="stTextArea"] textarea,
+    div[data-testid="stNumberInput"] input, div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+    div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div,
+    div[data-testid="stDateInput"] input, div[data-testid="stTimeInput"] input {
+        background: #111c2c !important; color: #f8fafc !important; border-color: #40516b !important; border-radius: 10px !important;
+        -webkit-text-fill-color: #f8fafc !important;
+    }
+    div[data-baseweb="popover"] ul, div[data-baseweb="popover"] li,
+    div[data-baseweb="menu"] { background: #111c2c !important; color: #f8fafc !important; }
+    div[data-baseweb="popover"] li:hover { background: #26364d !important; }
+    textarea::placeholder, input::placeholder { color: #a8b6c9 !important; opacity: 1 !important; }
+    [data-testid="stTextArea"] textarea:focus, [data-testid="stTextInput"] input:focus { border-color: #60a5fa !important; box-shadow: 0 0 0 1px #60a5fa !important; }
     div[data-testid="stTextInput"] input:focus, div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:focus-within { border-color: #60a5fa !important; box-shadow: 0 0 0 1px #60a5fa !important; }
     div.stButton > button { border-radius: 11px; min-height: 2.6rem; font-weight: 650; border: 1px solid #3b82f6; background: #1d4ed8; color: #fff; padding: .45rem 1.2rem; }
     div.stButton > button:hover { background: #2563eb; border-color: #60a5fa; color: #fff; }
@@ -519,7 +528,7 @@ def render_streaming_page():
     running = _alive(proc)
 
     if running:
-        st.success("Live FFmpeg process chal raha hai.")
+        st.success("The FFmpeg streaming process is running.")
         active = st.session_state.get("active_destinations", [])
         st.write("**Active destinations:** " + (", ".join(active) if active else "Unknown"))
         if st.button("⏹ Stop Streaming", type="primary", use_container_width=True):
@@ -531,10 +540,41 @@ def render_streaming_page():
         uploaded = None
         video_url = ""
         if source_mode == "Upload Video":
-            uploaded = st.file_uploader("MP4 video upload karein", type=["mp4"], key="stream_video")
+            uploaded = st.file_uploader("Upload an MP4 video", type=["mp4"], key="stream_video")
         else:
-            video_url = st.text_input("YouTube / Facebook / TikTok video URL", placeholder="https://...", key="stream_video_url")
-            st.caption("Supported public video URLs resolve karke direct stream hongi; video file download/save nahi hogi.")
+            video_url = st.text_input("Video URL (YouTube / Facebook / TikTok)", placeholder="https://...", key="stream_video_url")
+            st.caption("Public video URLs are resolved to a direct media stream. The video file is not downloaded or saved.")
+            fetch_col, _status_col = st.columns([1, 2])
+            with fetch_col:
+                fetch_clicked = st.button("🔎 Fetch / Check Video", key="fetch_video_url", use_container_width=True)
+            if fetch_clicked:
+                st.session_state.pop("resolved_video_source", None)
+                st.session_state.pop("resolved_video_url", None)
+                st.session_state.pop("resolved_video_headers", None)
+                if not video_url.strip():
+                    st.session_state["video_fetch_error"] = "Enter a video URL before fetching."
+                    st.session_state["video_fetch_error_source"] = video_url.strip()
+                    st.session_state.pop("video_fetch_success", None)
+                else:
+                    with st.spinner("Checking the video URL and resolving its media stream..."):
+                        try:
+                            resolved_url, resolved_headers = _resolve_video_url(video_url)
+                            st.session_state["resolved_video_source"] = video_url.strip()
+                            st.session_state["resolved_video_url"] = resolved_url
+                            st.session_state["resolved_video_headers"] = resolved_headers
+                            st.session_state["video_fetch_success"] = True
+                            st.session_state.pop("video_fetch_error", None)
+                        except Exception as exc:
+                            st.session_state["video_fetch_success"] = False
+                            st.session_state["video_fetch_error_source"] = video_url.strip()
+                            st.session_state["video_fetch_error"] = f"{type(exc).__name__}: {exc}"
+            if st.session_state.get("resolved_video_source") == video_url.strip() and st.session_state.get("video_fetch_success"):
+                st.success("Video fetched successfully — Ready to Live. You can now click Start Multi-Platform Live.")
+            elif (st.session_state.get("video_fetch_error")
+                  and st.session_state.get("video_fetch_error_source") == video_url.strip()):
+                st.error("Video fetch failed: " + st.session_state["video_fetch_error"])
+            else:
+                st.info("Video not checked yet. Click Fetch / Check Video before starting the live stream.")
         profiles = _load_profiles()
         hours = st.number_input("Stream duration (hours)", min_value=1, max_value=12, value=4, step=1)
         quality = st.selectbox("Output quality", ["1080p", "720p", "480p"])
@@ -545,11 +585,11 @@ def render_streaming_page():
             if destinations is not None:
                 source_is_upload = source_mode == "Upload Video"
                 if source_is_upload and uploaded is None:
-                    st.error("Pehle MP4 video upload karein.")
+                    st.error("Upload an MP4 video first.")
                 elif not source_is_upload and not video_url.strip():
-                    st.error("Pehle video URL paste karein.")
+                    st.error("Enter a video URL first.")
                 elif not destinations:
-                    st.error("Kam az kam ek platform ka Active toggle ON karein aur Stream Key enter karein.")
+                    st.error("Enable at least one platform and enter its stream key.")
                 else:
                     input_args = []
                     if source_is_upload:
@@ -557,17 +597,18 @@ def render_streaming_page():
                         path.write_bytes(uploaded.getbuffer())
                         input_args = ["-re", "-stream_loop", "-1", "-i", str(path)]
                     else:
-                        try:
-                            media_url, headers = _resolve_video_url(video_url)
+                        if (st.session_state.get("resolved_video_source") != video_url.strip()
+                                or not st.session_state.get("resolved_video_url")):
+                            st.error("Fetch the video URL first. Wait until the status says 'Ready to Live', then start streaming.")
+                            input_args = None
+                        else:
+                            media_url = st.session_state["resolved_video_url"]
+                            headers = st.session_state.get("resolved_video_headers") or {}
                             input_args = ["-re", "-rw_timeout", "20000000"]
                             if headers:
                                 header_text = _format_ffmpeg_headers(headers)
                                 input_args += ["-headers", header_text]
                             input_args += ["-i", media_url]
-                            st.info("Video URL resolve ho gaya. FFmpeg ab source ko selected platforms par bhej raha hai.")
-                        except Exception as exc:
-                            st.error(f"Video URL resolve nahi ho saka: {type(exc).__name__}: {exc}")
-                            input_args = None
                     if input_args is not None:
                         _save_layers([])
                         outputs = []
@@ -613,16 +654,16 @@ def render_streaming_page():
                                 try:
                                     failure_log = LOG_PATH.read_text(encoding="utf-8", errors="replace")
                                 except OSError:
-                                    failure_log = "FFmpeg process startup par band ho gaya."
-                                st.error("FFmpeg stream start nahi kar saka. Diagnostic log:")
-                                st.code(failure_log[-10000:] or "No FFmpeg diagnostic output.")
+                                    failure_log = "FFmpeg exited during startup."
+                                st.error("FFmpeg could not start the stream. Diagnostic log:")
+                                st.code(failure_log[-10000:] or "No FFmpeg diagnostic output was recorded.")
                             else:
-                                st.success("FFmpeg stream chal rahi hai. Facebook Live Producer mein incoming preview aane ke baad Go Live press karein.")
+                                st.success("FFmpeg is running. On Facebook Live Producer, wait for the incoming preview and then click Go Live.")
                                 st.rerun()
                         except FileNotFoundError:
-                            st.error("FFmpeg server par available nahi. packages.txt check karein.")
+                            st.error("FFmpeg is not available on the server. Check packages.txt.")
                         except Exception as exc:
-                            st.error(f"Stream start nahi ho saki: {exc}")
+                            st.error(f"Could not start stream: {exc}")
 
     if running:
         _render_graphics_studio()
@@ -630,7 +671,7 @@ def render_streaming_page():
         with st.expander("FFmpeg diagnostic log", expanded=False):
             try:
                 log_text = LOG_PATH.read_text(encoding="utf-8", errors="replace")
-                st.code(log_text[-12000:] if log_text else "Abhi koi FFmpeg warning/error record nahi hui.")
+                st.code(log_text[-12000:] if log_text else "No FFmpeg warnings or errors have been recorded yet.")
             except OSError as exc:
-                st.caption(f"Log read nahi ho saka: {exc}")
+                st.caption(f"Could not read log: {exc}")
     st.markdown("---")
