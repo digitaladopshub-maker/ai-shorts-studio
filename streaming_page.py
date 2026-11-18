@@ -5,6 +5,8 @@ import time
 import threading
 import subprocess
 import uuid
+import urllib.request
+import urllib.error
 from pathlib import Path
 
 import streamlit as st
@@ -94,6 +96,29 @@ def _resolve_video_url(source_url):
     if not media_url:
         raise ValueError("Could not resolve a direct audio/video stream. The link may be private, login-protected, live-only, or unsupported.")
     return media_url, headers
+
+
+def _probe_media_url(media_url, headers=None, timeout=20):
+    """Verify that the resolved media URL is currently readable without downloading it."""
+    request_headers = dict(headers or {})
+    request_headers["Range"] = "bytes=0-0"
+    request = urllib.request.Request(media_url, headers=request_headers, method="GET")
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            status = getattr(response, "status", response.getcode())
+            if status not in (200, 206):
+                raise ValueError(f"Media server returned HTTP {status} during the playback check.")
+            response.read(1)
+    except urllib.error.HTTPError as exc:
+        if exc.code == 403:
+            raise ValueError(
+                "The media server returned HTTP 403 during the playback check. "
+                "The link may be expired or require a matching login/session. Fetch the URL again."
+            ) from exc
+        raise ValueError(f"Media playback check failed with HTTP {exc.code}: {exc.reason}") from exc
+    except urllib.error.URLError as exc:
+        raise ValueError(f"Could not reach the media server during the playback check: {exc.reason}") from exc
+    return True
 
 
 def _format_ffmpeg_headers(headers):
@@ -559,6 +584,7 @@ def render_streaming_page():
                     with st.spinner("Checking the video URL and resolving its media stream..."):
                         try:
                             resolved_url, resolved_headers = _resolve_video_url(video_url)
+                            _probe_media_url(resolved_url, resolved_headers)
                             st.session_state["resolved_video_source"] = video_url.strip()
                             st.session_state["resolved_video_url"] = resolved_url
                             st.session_state["resolved_video_headers"] = resolved_headers
@@ -602,13 +628,25 @@ def render_streaming_page():
                             st.error("Fetch the video URL first. Wait until the status says 'Ready to Live', then start streaming.")
                             input_args = None
                         else:
-                            media_url = st.session_state["resolved_video_url"]
-                            headers = st.session_state.get("resolved_video_headers") or {}
-                            input_args = ["-re", "-rw_timeout", "20000000"]
-                            if headers:
-                                header_text = _format_ffmpeg_headers(headers)
-                                input_args += ["-headers", header_text]
-                            input_args += ["-i", media_url]
+                            try:
+                                # Signed media URLs can expire or be IP/session-bound.
+                                # Resolve and verify a fresh URL immediately before FFmpeg starts.
+                                media_url, headers = _resolve_video_url(video_url)
+                                _probe_media_url(media_url, headers)
+                                st.session_state["resolved_video_url"] = media_url
+                                st.session_state["resolved_video_headers"] = headers
+                                input_args = ["-re", "-rw_timeout", "20000000"]
+                                if headers:
+                                    header_text = _format_ffmpeg_headers(headers)
+                                    input_args += ["-headers", header_text]
+                                input_args += ["-i", media_url]
+                            except Exception as exc:
+                                st.error(
+                                    "The video URL was fetched earlier, but playback verification failed "
+                                    f"before streaming: {type(exc).__name__}: {exc}"
+                                )
+                                st.info("Click Fetch / Check Video again. If the error continues, the source may require a supported login/session.")
+                                input_args = None
                     if input_args is not None:
                         _save_layers([])
                         outputs = []
