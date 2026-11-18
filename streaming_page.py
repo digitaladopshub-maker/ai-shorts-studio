@@ -49,20 +49,31 @@ def _alive(proc):
 
 def _resolve_video_url(source_url):
     """Resolve a supported public page URL to one muxed media stream."""
+    source_url = (source_url or "").strip()
+    if not source_url.lower().startswith(("http://", "https://")):
+        raise ValueError("Valid http:// ya https:// video page URL enter karein.")
+
     from yt_dlp import YoutubeDL
 
     options = {
-        "format": "best[protocol^=http][vcodec!=none][acodec!=none]/best[vcodec!=none][acodec!=none]/best",
+        # Prefer a single file carrying both audio and video. Keep HLS/DASH
+        # muxed formats eligible as a fallback for platforms that use them.
+        "format": (
+            "best[protocol^=http][vcodec!=none][acodec!=none]/"
+            "best[protocol^=m3u8][vcodec!=none][acodec!=none]/"
+            "best[vcodec!=none][acodec!=none]/best"
+        ),
         "quiet": True, "no_warnings": True, "noplaylist": True,
         "skip_download": True, "extract_flat": False,
-        "socket_timeout": 20, "retries": 2, "extractor_retries": 2,
+        "socket_timeout": 30, "retries": 3, "extractor_retries": 3,
     }
     with YoutubeDL(options) as ydl:
-        info = ydl.extract_info(source_url.strip(), download=False)
+        info = ydl.extract_info(source_url, download=False)
     if info and info.get("entries"):
         info = next((entry for entry in info["entries"] if entry), None)
     if not info:
         raise ValueError("URL se video information nahi mili.")
+
     media_url = info.get("url")
     headers = info.get("http_headers") or {}
     if not media_url:
@@ -70,11 +81,24 @@ def _resolve_video_url(source_url):
                    if x.get("url") and x.get("vcodec") != "none"
                    and x.get("acodec") != "none"]
         if formats:
-            media_url = formats[-1]["url"]
-            headers = formats[-1].get("http_headers") or headers
+            # Prefer a muxed HTTP/HLS format; never pass separate video-only
+            # and audio-only URLs to the single-input FFmpeg pipeline.
+            formats.sort(key=lambda x: (
+                x.get("protocol", "").startswith(("http", "m3u8")),
+                x.get("height") or 0,
+                x.get("tbr") or 0,
+            ))
+            selected = formats[-1]
+            media_url = selected["url"]
+            headers = selected.get("http_headers") or headers
     if not media_url:
-        raise ValueError("Is link se direct playable video stream resolve nahi hui.")
+        raise ValueError("Is link se audio+video wala direct stream resolve nahi hua. Mumkin hai link private, login-protected, live-only, ya unsupported ho.")
     return media_url, headers
+
+
+def _format_ffmpeg_headers(headers):
+    """Convert yt-dlp request headers to FFmpeg's required CRLF format."""
+    return "".join(f"{key}: {value}\r\n" for key, value in (headers or {}).items())
 
 
 def _load_layers():
@@ -537,7 +561,7 @@ def render_streaming_page():
                             media_url, headers = _resolve_video_url(video_url)
                             input_args = ["-re", "-rw_timeout", "20000000"]
                             if headers:
-                                header_text = "".join(f"{k}: {v}\\r\\n" for k, v in headers.items())
+                                header_text = _format_ffmpeg_headers(headers)
                                 input_args += ["-headers", header_text]
                             input_args += ["-i", media_url]
                             st.info("Video URL resolve ho gaya. FFmpeg ab source ko selected platforms par bhej raha hai.")
