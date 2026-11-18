@@ -473,7 +473,14 @@ def render_streaming_page():
             st.session_state.active_destinations = []
             st.rerun()
     else:
-        uploaded = st.file_uploader("MP4 video upload karein", type=["mp4"], key="stream_video")
+        source_mode = st.radio("Video Source", ["Upload Video", "Video URL"], horizontal=True, key="stream_source_mode")
+        uploaded = None
+        video_url = ""
+        if source_mode == "Upload Video":
+            uploaded = st.file_uploader("MP4 video upload karein", type=["mp4"], key="stream_video")
+        else:
+            video_url = st.text_input("YouTube / Facebook / TikTok video URL", placeholder="https://...", key="stream_video_url")
+            st.caption("Supported public video URLs resolve karke direct stream hongi; video file download/save nahi hogi.")
         profiles = _load_profiles()
         hours = st.number_input("Stream duration (hours)", min_value=1, max_value=12, value=4, step=1)
         quality = st.selectbox("Output quality", ["1080p", "720p", "480p"])
@@ -482,55 +489,83 @@ def render_streaming_page():
         if st.button("▶ Start Multi-Platform Live", type="primary", use_container_width=True):
             destinations = list(profiles)
             if destinations is not None:
-                if uploaded is None:
+                source_is_upload = source_mode == "Upload Video"
+                if source_is_upload and uploaded is None:
                     st.error("Pehle MP4 video upload karein.")
+                elif not source_is_upload and not video_url.strip():
+                    st.error("Pehle video URL paste karein.")
                 elif not destinations:
                     st.error("Kam az kam ek platform ka Active toggle ON karein aur Stream Key enter karein.")
                 else:
-                    path = STREAM_DIR / "live_input.mp4"
-                    path.write_bytes(uploaded.getbuffer())
-                    _save_layers([])
-                    outputs = []
-                    active_names = []
-                    for dest in destinations:
-                        target = dest["server"].rstrip("/") + "/" + dest["key"].strip()
-                        outputs.append("[f=flv:onfail=ignore]" + _tee_escape(target))
-                        active_names.append(dest.get("platform", "") + " — " + dest.get("name", ""))
-                    tee_target = "|".join(outputs)
-                    stop_event = threading.Event()
-                    try:
-                        LOG_PATH.write_text("", encoding="utf-8")
-                    except OSError:
-                        pass
-                    vf = f"scale={dims}:force_original_aspect_ratio=decrease,pad={dims}:(ow-iw)/2:(oh-ih)/2"
-                    cmd = [
-                        "ffmpeg", "-hide_banner", "-loglevel", "info",
-                        "-re", "-stream_loop", "-1", "-i", str(path),
-                        "-thread_queue_size", "64", "-f", "rawvideo", "-pix_fmt", "rgba",
-                        "-video_size", f"{CANVAS_W}x{CANVAS_H}", "-framerate", str(OVERLAY_FPS), "-i", "pipe:0",
-                        "-filter_complex", f"[0:v]{vf}[base];[1:v]scale={dims}:flags=fast_bilinear[ov];[base][ov]overlay=0:0:format=auto:shortest=0[v]",
-                        "-map", "[v]", "-map", "0:a?", "-t", str(int(hours * 3600)), "-r", "30",
-                        "-c:v", "libx264", "-preset", "veryfast", "-b:v", rate, "-maxrate", rate, "-bufsize", rate,
-                        "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
-                        "-f", "tee", tee_target,
-                    ]
-                    try:
-                        process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, bufsize=0)
-                        st.session_state.stream_process = process
-                        st.session_state.overlay_stop_event = stop_event
-                        log_reader = threading.Thread(target=_stderr_reader, args=(process,), daemon=True)
-                        log_reader.start()
-                        st.session_state.ffmpeg_log_thread = log_reader
-                        writer = threading.Thread(target=_overlay_writer, args=(process, stop_event), daemon=True)
-                        writer.start()
-                        st.session_state.overlay_thread = writer
-                        st.session_state.active_destinations = active_names
-                        st.success("Multi-platform stream start command bhej diya gaya. Har platform par Live status verify karein.")
-                        st.rerun()
-                    except FileNotFoundError:
-                        st.error("FFmpeg server par available nahi. packages.txt check karein.")
-                    except Exception as exc:
-                        st.error(f"Stream start nahi ho saki: {exc}")
+                    input_args = []
+                    if source_is_upload:
+                        path = STREAM_DIR / "live_input.mp4"
+                        path.write_bytes(uploaded.getbuffer())
+                        input_args = ["-re", "-stream_loop", "-1", "-i", str(path)]
+                    else:
+                        try:
+                            from yt_dlp import YoutubeDL
+                            ydl_opts = {
+                                "format": "best[protocol^=http][vcodec!=none][acodec!=none]/best",
+                                "quiet": True, "no_warnings": True, "noplaylist": True,
+                                "skip_download": True,
+                            }
+                            with YoutubeDL(ydl_opts) as ydl:
+                                info = ydl.extract_info(video_url.strip(), download=False)
+                            if not info or not info.get("url"):
+                                raise ValueError("Is URL se playable video stream resolve nahi hui.")
+                            input_args = ["-re"]
+                            headers = info.get("http_headers") or {}
+                            if headers:
+                                header_text = "".join(f"{k}: {v}\r\n" for k, v in headers.items())
+                                input_args += ["-headers", header_text]
+                            input_args += ["-i", info["url"]]
+                        except Exception as exc:
+                            st.error(f"Video URL resolve nahi ho saka: {exc}")
+                            input_args = None
+                    if input_args is not None:
+                        _save_layers([])
+                        outputs = []
+                        active_names = []
+                        for dest in destinations:
+                            target = dest["server"].rstrip("/") + "/" + dest["key"].strip()
+                            outputs.append("[f=flv:onfail=ignore]" + _tee_escape(target))
+                            active_names.append(dest.get("platform", "") + " — " + dest.get("name", ""))
+                        tee_target = "|".join(outputs)
+                        stop_event = threading.Event()
+                        try:
+                            LOG_PATH.write_text("", encoding="utf-8")
+                        except OSError:
+                            pass
+                        vf = f"scale={dims}:force_original_aspect_ratio=decrease,pad={dims}:(ow-iw)/2:(oh-ih)/2"
+                        cmd = [
+                            "ffmpeg", "-hide_banner", "-loglevel", "info",
+                            *input_args,
+                            "-thread_queue_size", "64", "-f", "rawvideo", "-pix_fmt", "rgba",
+                            "-video_size", f"{CANVAS_W}x{CANVAS_H}", "-framerate", str(OVERLAY_FPS), "-i", "pipe:0",
+                            "-filter_complex", f"[0:v]{vf}[base];[1:v]scale={dims}:flags=fast_bilinear[ov];[base][ov]overlay=0:0:format=auto:shortest=0[v]",
+                            "-map", "[v]", "-map", "0:a?", "-t", str(int(hours * 3600)), "-r", "30",
+                            "-c:v", "libx264", "-preset", "veryfast", "-b:v", rate, "-maxrate", rate, "-bufsize", rate,
+                            "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
+                            "-f", "tee", tee_target,
+                        ]
+                        try:
+                            process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, bufsize=0)
+                            st.session_state.stream_process = process
+                            st.session_state.overlay_stop_event = stop_event
+                            log_reader = threading.Thread(target=_stderr_reader, args=(process,), daemon=True)
+                            log_reader.start()
+                            st.session_state.ffmpeg_log_thread = log_reader
+                            writer = threading.Thread(target=_overlay_writer, args=(process, stop_event), daemon=True)
+                            writer.start()
+                            st.session_state.overlay_thread = writer
+                            st.session_state.active_destinations = active_names
+                            st.success("Multi-platform stream start command bhej diya gaya. Har platform par Live status verify karein.")
+                            st.rerun()
+                        except FileNotFoundError:
+                            st.error("FFmpeg server par available nahi. packages.txt check karein.")
+                        except Exception as exc:
+                            st.error(f"Stream start nahi ho saki: {exc}")
 
     if running:
         _render_graphics_studio()
