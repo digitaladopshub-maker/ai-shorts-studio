@@ -47,6 +47,36 @@ def _alive(proc):
     return proc is not None and proc.poll() is None
 
 
+def _resolve_video_url(source_url):
+    """Resolve a supported public page URL to one muxed media stream."""
+    from yt_dlp import YoutubeDL
+
+    options = {
+        "format": "best[protocol^=http][vcodec!=none][acodec!=none]/best[vcodec!=none][acodec!=none]/best",
+        "quiet": True, "no_warnings": True, "noplaylist": True,
+        "skip_download": True, "extract_flat": False,
+        "socket_timeout": 20, "retries": 2, "extractor_retries": 2,
+    }
+    with YoutubeDL(options) as ydl:
+        info = ydl.extract_info(source_url.strip(), download=False)
+    if info and info.get("entries"):
+        info = next((entry for entry in info["entries"] if entry), None)
+    if not info:
+        raise ValueError("URL se video information nahi mili.")
+    media_url = info.get("url")
+    headers = info.get("http_headers") or {}
+    if not media_url:
+        formats = [x for x in (info.get("formats") or [])
+                   if x.get("url") and x.get("vcodec") != "none"
+                   and x.get("acodec") != "none"]
+        if formats:
+            media_url = formats[-1]["url"]
+            headers = formats[-1].get("http_headers") or headers
+    if not media_url:
+        raise ValueError("Is link se direct playable video stream resolve nahi hui.")
+    return media_url, headers
+
+
 def _load_layers():
     try:
         with open(STATE_PATH, "r", encoding="utf-8") as f:
@@ -504,24 +534,15 @@ def render_streaming_page():
                         input_args = ["-re", "-stream_loop", "-1", "-i", str(path)]
                     else:
                         try:
-                            from yt_dlp import YoutubeDL
-                            ydl_opts = {
-                                "format": "best[protocol^=http][vcodec!=none][acodec!=none]/best",
-                                "quiet": True, "no_warnings": True, "noplaylist": True,
-                                "skip_download": True,
-                            }
-                            with YoutubeDL(ydl_opts) as ydl:
-                                info = ydl.extract_info(video_url.strip(), download=False)
-                            if not info or not info.get("url"):
-                                raise ValueError("Is URL se playable video stream resolve nahi hui.")
-                            input_args = ["-re"]
-                            headers = info.get("http_headers") or {}
+                            media_url, headers = _resolve_video_url(video_url)
+                            input_args = ["-re", "-rw_timeout", "20000000"]
                             if headers:
-                                header_text = "".join(f"{k}: {v}\r\n" for k, v in headers.items())
+                                header_text = "".join(f"{k}: {v}\\r\\n" for k, v in headers.items())
                                 input_args += ["-headers", header_text]
-                            input_args += ["-i", info["url"]]
+                            input_args += ["-i", media_url]
+                            st.info("Video URL resolve ho gaya. FFmpeg ab source ko selected platforms par bhej raha hai.")
                         except Exception as exc:
-                            st.error(f"Video URL resolve nahi ho saka: {exc}")
+                            st.error(f"Video URL resolve nahi ho saka: {type(exc).__name__}: {exc}")
                             input_args = None
                     if input_args is not None:
                         _save_layers([])
@@ -560,8 +581,20 @@ def render_streaming_page():
                             writer.start()
                             st.session_state.overlay_thread = writer
                             st.session_state.active_destinations = active_names
-                            st.success("Multi-platform stream start command bhej diya gaya. Har platform par Live status verify karein.")
-                            st.rerun()
+                            time.sleep(1.2)
+                            if process.poll() is not None:
+                                stop_event.set()
+                                st.session_state.stream_process = None
+                                st.session_state.active_destinations = []
+                                try:
+                                    failure_log = LOG_PATH.read_text(encoding="utf-8", errors="replace")
+                                except OSError:
+                                    failure_log = "FFmpeg process startup par band ho gaya."
+                                st.error("FFmpeg stream start nahi kar saka. Diagnostic log:")
+                                st.code(failure_log[-10000:] or "No FFmpeg diagnostic output.")
+                            else:
+                                st.success("FFmpeg stream chal rahi hai. Facebook Live Producer mein incoming preview aane ke baad Go Live press karein.")
+                                st.rerun()
                         except FileNotFoundError:
                             st.error("FFmpeg server par available nahi. packages.txt check karein.")
                         except Exception as exc:
